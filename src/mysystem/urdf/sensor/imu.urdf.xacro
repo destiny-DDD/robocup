@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:include filename="../yuan.urdf.xacro"/>
+
+    <xacro:macro name="imu" params="imu_name">
+        <link name="${imu_name}">
+            <visual>
+                <origin xyz="0.0 0.0 0.0"/>
+                <geometry>
+                    <box size="0.03 0.03 0.03"/>
+                </geometry>
+                <material name="red">
+                    <color rgba="1.0 0.0 0.0 1.0"/>
+                </material>
+            </visual>
+            <xacro:box_collision x="0.03" y="0.03" z="0.03"/>
+        </link>
+
+        <joint name="${imu_name}_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="${imu_name}"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        </joint>
+    </xacro:macro>
+</robot>

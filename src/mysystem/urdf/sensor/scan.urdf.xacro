@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:include filename="../yuan.urdf.xacro"/>
+
+    <xacro:macro name="scan" params="scan_name">
+        <link name="${scan_name}">
+            <xacro:sphere_visual r="0.03"/>
+            <xacro:sphere_collision r="0.03"/>
+        </link>
+
+        <link name="${scan_name}_platform">
+            <visual>
+                <origin xyz="0.0 0.0 0.0"/>
+                <geometry>
+                    <cylinder radius="0.01" length="0.05"/>
+                </geometry>
+                <material name="green">
+                    <color rgba="0.0 1.0 0.0 1.0"/>
+                </material>
+            </visual>
+            <xacro:cylinder_collision r="0.01" h="0.01"/>
+        </link>
+
+        <joint name="${scan_name}_platform_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="${scan_name}_platform"/>
+            <origin xyz="0.0 0.0 0.05" rpy="0.0 0.0 0.0"/>
+        </joint>
+
+        <joint name="${scan_name}_joint" type="fixed">
+            <parent link="${scan_name}_platform"/>
+            <child link="${scan_name}"/>
+            <origin xyz="0.0 0.0 0.05" rpy="0.0 0.0 0.0"/>
+        </joint>
+    </xacro:macro>
+</robot>

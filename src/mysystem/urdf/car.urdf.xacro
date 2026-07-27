@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="car">
+    <xacro:include filename="base.urdf.xacro"/>
+    <xacro:include filename="sensor/scan.urdf.xacro"/>
+    <xacro:include filename="sensor/imu.urdf.xacro"/>
+    <xacro:include filename="wheel/wheel.urdf.xacro"/>
+
+    <xacro:base_xacro x="0.3" y="0.3" z="0.05" r="0.075"/>
+    <xacro:scan scan_name="livox_frame"/>
+    <xacro:imu imu_name="gyro_link"/>
+    <xacro:wheel wheel_name="wheel_1" xyz="0.125 0.17 0.0" axis_xyz="0.0 1.0 0.0" rpy="1.57079 0.0 0.0"/>
+    <xacro:wheel wheel_name="wheel_2" xyz="0.125 -0.17 0.0" axis_xyz="0.0 1.0 0.0" rpy="1.57079 0.0 0.0"/>
+    <xacro:wheel wheel_name="wheel_3" xyz="-0.125 0.17 0.0" axis_xyz="0.0 1.0 0.0" rpy="1.57079 0.0 0.0"/>
+    <xacro:wheel wheel_name="wheel_4" xyz="-0.125 -0.17 0.0" axis_xyz="0.0 1.0 0.0" rpy="1.57079 0.0 0.0"/>
+</robot>

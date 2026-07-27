@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:include filename="../yuan.urdf.xacro"/>
+
+    <xacro:macro name="wheel" params="wheel_name xyz axis_xyz rpy:='0 0.0 0.0'">
+        <link name="${wheel_name}_link">
+            <xacro:cylinder_visual r="0.075" h="0.04" rpy="${rpy}"/>
+            <xacro:cylinder_collision r="0.075" h="0.04" rpy="${rpy}"/>
+        </link>
+
+        <joint name="${wheel_name}_joint" type="continuous">
+            <parent link="base_link"/>
+            <child link="${wheel_name}_link"/>
+            <origin xyz="${xyz}" rpy="0.0 0.0 0.0"/>
+            <axis xyz="${axis_xyz}"/>
+        </joint>
+    </xacro:macro>
+</robot>

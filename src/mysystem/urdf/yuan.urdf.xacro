@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <!-- 视觉 -->
+    <!-- 方形 -->
+    <xacro:macro name="box_visual" params="x y z rpy:='0 0.0 0.0'">
+        <visual>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <geometry>
+                <box size="${x} ${y} ${z}"/>
+            </geometry>
+            <material name="white">
+                <color rgba="1.0 1.0 1.0 0.5"/>
+            </material>
+        </visual>
+    </xacro:macro>
+    <!-- 圆柱 -->
+    <xacro:macro name="cylinder_visual" params="r h rpy:='0.0 0.0 0.0'">
+        <visual>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <geometry>
+                <cylinder radius="${r}" length="${h}"/>
+            </geometry>
+            <material name="white">
+                <color rgba="1.0 1.0 1.0 0.5"/>
+            </material>
+        </visual>
+    </xacro:macro>
+    <!-- 球 -->
+    <xacro:macro name="sphere_visual" params="r rpy:='0.0 0.0 0.0'">
+        <visual>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <geometry>
+                <sphere radius="${r}"/>
+            </geometry>
+            <material name="white">
+                <color rgba="1.0 1.0 1.0 0.5"/>
+            </material>
+        </visual>
+    </xacro:macro>
+
+    <!-- 碰撞 -->
+    <!-- 方形 -->
+    <xacro:macro name="box_collision" params="x y z rpy:='0.0 0.0 0.0'">
+        <collision>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <geometry>
+                <box size="${x} ${y} ${z}"/>
+            </geometry>
+        </collision>
+    </xacro:macro>
+    <!-- 圆柱 -->
+    <xacro:macro name="cylinder_collision" params="r h rpy:='0.0 0.0 0.0'">
+        <collision>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <geometry>
+                <cylinder radius="${r}" length="${h}"/>
+            </geometry>
+        </collision>
+    </xacro:macro>
+    <!-- 球 -->
+    <xacro:macro name="sphere_collision" params="r rpy:='0.0 0.0 0.0'">
+        <collision>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <geometry>
+                <sphere radius="${r}"/>
+            </geometry>
+        </collision>
+    </xacro:macro>
+
+    <!-- 惯性 -->
+    <!-- 方形 -->
+    <xacro:macro name="box_inertia" params="m x y z rpy:='0.0 0.0 0.0'">
+        <inertial>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <mass value="${m}" />
+            <inertia ixx="${(m/12) * (y*y + z*z)}" ixy="0.0" ixz="0.0" iyy="${(m/12) * (x*x + z*z)}" iyz="0.0" izz="${(m/12) * (x*x + y*y)}" />
+        </inertial>
+    </xacro:macro>
+    <!-- 圆柱 -->
+    <xacro:macro name="cylinder_inertia" params="m r h rpy:='0.0 0.0 0.0'">
+        <inertial>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <mass value="${m}" />
+            <inertia ixx="${(m/12) * (3*r*r + h*h)}" ixy="0" ixz="0" iyy="${(m/12) * (3*r*r + h*h)}" iyz="0" izz="${(m/2) * (r*r)}" />
+        </inertial>
+    </xacro:macro>
+    <!-- 球 -->
+    <xacro:macro name="sphere_inertia" params="m r rpy:='0.0 0.0 0.0'">
+        <inertial>
+            <origin xyz="0.0 0.0 0.0" rpy="${rpy}"/>
+            <mass value="${m}" />
+            <inertia ixx="${(2/5) * m * (r*r)}" ixy="0.0" ixz="0.0" iyy="${(2/5) * m * (r*r)}" iyz="0.0" izz="${(2/5) * m * (r*r)}" />
+        </inertial>
+    </xacro:macro>
+
+</robot>
