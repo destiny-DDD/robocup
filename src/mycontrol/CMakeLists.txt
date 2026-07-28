@@ -9,9 +9,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
-# include_directories(include/${PROJECT_NAME})
-# file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-# ament_auto_add_executable(${PROJECT_NAME} ${SRC})
+
+include_directories(include/${PROJECT_NAME})
+file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+ament_auto_add_executable(${PROJECT_NAME} ${SRC})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
