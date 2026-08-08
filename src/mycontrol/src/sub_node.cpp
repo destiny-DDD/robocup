@@ -38,22 +38,25 @@ void MySub::TimeCallback() {
   tf2::Quaternion q;
   q.setRPY(0.0, 0.0, change.yaw_);
 
-  transform.header.stamp = now_time_;
-  transform.header.frame_id = odom_frame_;
-  transform.child_frame_id = child_frame_;
-  transform.transform.translation.x = change.x_;
-  transform.transform.translation.y = change.y_;
-  transform.transform.translation.z = 0.0;
-  transform.transform.rotation.x = q.x();
-  transform.transform.rotation.y = q.y();
-  transform.transform.rotation.z = q.z();
-  transform.transform.rotation.w = q.w();
+  if (tf_yn) {
+    transform.header.stamp = now_time_;
+    transform.header.frame_id = odom_frame_;
+    transform.child_frame_id = child_frame_;
+    transform.transform.translation.x = change.x_;
+    transform.transform.translation.y = change.y_;
+    transform.transform.translation.z = 0.0;
+    transform.transform.rotation.x = q.x();
+    transform.transform.rotation.y = q.y();
+    transform.transform.rotation.z = q.z();
+    transform.transform.rotation.w = q.w();
 
-  tf_->sendTransform(transform);
+    tf_->sendTransform(transform);
+  }
 }
 
 void MySub::Init() {
   odom_frame_ = this->declare_parameter("odom_frame", "odom");
   child_frame_ = this->declare_parameter("child_frame", "base_footprint");
+  tf_yn = this->declare_parameter<bool>("tf_yn", true);
 }
 } // namespace control_sub

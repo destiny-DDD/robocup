@@ -29,11 +29,12 @@ private:
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_;
   geometry_msgs::msg::TransformStamped transform{}; // 结构体初始化
   TFdata change{0.0f, 0.0f, 0.0f};
-  // 发布odom话题
+  // 发布odom话题，用于ekf融合
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_; // 创建odom
   // 参数
   std::string odom_frame_;
   std::string child_frame_;
+  bool tf_yn;
 
 public:
   MySub(const std::string &name, std::shared_ptr<control_ser::MySer> serial);
