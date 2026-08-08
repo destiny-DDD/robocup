@@ -24,7 +24,7 @@ source install/setup.bash
 ### 1. 创建虚拟串口对
 
 ```bash
-socat -d -d pty,raw,echo=0,link=/tmp/vtx pty,raw,echo=0,link=/tmp/vrx &
+socat -d -d pty,raw,echo=0,link=/tmp/vtx pty,raw,echo=0,link=/tmp/vrx
 ```
 
 `/tmp/vtx` ←→ `/tmp/vrx` 互为收发：写 tx 的数据从 rx 读出，反之亦然。

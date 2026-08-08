@@ -4,6 +4,9 @@ namespace control_sub {
 MySub::MySub(const std::string &name,
              std::shared_ptr<control_ser::MySer> serial)
     : Node(name), serial_(std::move(serial)) {
+  Init();
+  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
+  tf_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
   serial_->start_receive([this](const std::vector<uint8_t> &buffer) {
     if (buffer.size() < sizeof(control_ser::WheelMsg)) {
       RCLCPP_WARN(this->get_logger(), "收到不完整数据: %zu 字节",
@@ -14,5 +17,43 @@ MySub::MySub(const std::string &name,
     RCLCPP_INFO(this->get_logger(), "收到: x=%.2f y=%.2f z=%.2f", msg.speed_x,
                 msg.speed_y, msg.ang_z);
   });
+  last_time_ = this->now();
+  timer_ = this->create_wall_timer(std::chrono::milliseconds(20),
+                                   std::bind(&MySub::TimeCallback, this));
+}
+void MySub::TimeCallback() {
+  now_time_ = this->now();
+  dt = (now_time_ - last_time_).seconds();
+  if (dt <= 0.0 || dt > 0.5) // 25倍时间间隔
+    dt = 0.02;
+  last_time_ = now_time_;
+  change.yaw_ += msg.ang_z * dt;
+  change.x_ += (msg.speed_x * std::cos(change.yaw_) -
+                msg.speed_y * std::sin(change.yaw_)) *
+               dt;
+  change.y_ += (msg.speed_x * std::sin(change.yaw_) +
+                msg.speed_y * std::cos(change.yaw_)) *
+               dt;
+
+  tf2::Quaternion q;
+  q.setRPY(0.0, 0.0, change.yaw_);
+
+  transform.header.stamp = now_time_;
+  transform.header.frame_id = odom_frame_;
+  transform.child_frame_id = child_frame_;
+  transform.transform.translation.x = change.x_;
+  transform.transform.translation.y = change.y_;
+  transform.transform.translation.z = 0.0;
+  transform.transform.rotation.x = q.x();
+  transform.transform.rotation.y = q.y();
+  transform.transform.rotation.z = q.z();
+  transform.transform.rotation.w = q.w();
+
+  tf_->sendTransform(transform);
+}
+
+void MySub::Init() {
+  odom_frame_ = this->declare_parameter("odom_frame", "odom");
+  child_frame_ = this->declare_parameter("child_frame", "base_footprint");
 }
 } // namespace control_sub

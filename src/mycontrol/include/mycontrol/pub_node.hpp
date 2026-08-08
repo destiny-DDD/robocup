@@ -2,8 +2,8 @@
 #define __PUB_NODE_H_
 
 #include "my_serial.hpp"
-#include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 
 namespace control_pub {
 class MyPub : public rclcpp::Node {
