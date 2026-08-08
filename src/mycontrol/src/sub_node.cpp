@@ -13,7 +13,7 @@ MySub::MySub(const std::string &name,
                   buffer.size());
       return;
     }
-    std::memcpy(&msg, buffer.data(), sizeof(msg));
+    std::memcpy(&msg, buffer.data(), sizeof(msg)); // 把数据存到msg里
     RCLCPP_INFO(this->get_logger(), "收到: x=%.2f y=%.2f z=%.2f", msg.speed_x,
                 msg.speed_y, msg.ang_z);
   });
@@ -37,6 +37,25 @@ void MySub::TimeCallback() {
 
   tf2::Quaternion q;
   q.setRPY(0.0, 0.0, change.yaw_);
+
+  odom_msg.header.stamp = now_time_;
+  odom_msg.header.frame_id = odom_frame_;
+  odom_msg.child_frame_id = child_frame_;
+  odom_msg.pose.pose.position.x = change.x_;
+  odom_msg.pose.pose.position.y = change.y_;
+  odom_msg.pose.pose.position.z = 0.0;
+  odom_msg.pose.pose.orientation.x = q.x();
+  odom_msg.pose.pose.orientation.y = q.y();
+  odom_msg.pose.pose.orientation.z = q.z();
+  odom_msg.pose.pose.orientation.w = q.w();
+  odom_msg.twist.twist.linear.x = msg.speed_x;
+  odom_msg.twist.twist.linear.y = msg.speed_y;
+  odom_msg.twist.twist.linear.z = 0.0;
+  odom_msg.twist.twist.angular.x = 0.0;
+  odom_msg.twist.twist.angular.y = 0.0;
+  odom_msg.twist.twist.angular.z = msg.ang_z;
+
+  odom_pub_->publish(odom_msg);
 
   if (tf_yn) {
     transform.header.stamp = now_time_;

@@ -31,6 +31,7 @@ private:
   TFdata change{0.0f, 0.0f, 0.0f};
   // 发布odom话题，用于ekf融合
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_; // 创建odom
+  nav_msgs::msg::Odometry odom_msg{}; // odom话题内容
   // 参数
   std::string odom_frame_;
   std::string child_frame_;
