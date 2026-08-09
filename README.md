@@ -1,5 +1,16 @@
-
-
+```
+robocup/
+├── .gitignore                # 隐藏文件
+│
+├── README.md                 # ← 你正在看的这份
+│
+└── src/
+    ├── mycontrol/                          # 机器人控制逻辑
+    ├── myekf/         　　　　　　　　　      # ekf融合
+    ├── mysystem/                           # 启动rviz2和发布机器人静态TF
+    ├── rf2o_laser_odometry/                # rf2o(处理激光雷达数据)的launch文件
+    └── yesense_ros2/                       # imu的launch文件
+```
 ### RF2O
 在工作目录src下
 ```
