@@ -9,7 +9,7 @@ def generate_launch_description():
 
     # 默认 xacro 文件路径
     xacro_file = os.path.join(pkg_dir_system, "urdf", "car.urdf.xacro")
-    default_rviz_config_path=os.path.join(pkg_dir_system,"config","rviz.rviz")
+    default_rviz_config_path=os.path.join(pkg_dir_system,"config","rviz2.rviz")
 
     action_declare_arg_mode_path=launch.actions.DeclareLaunchArgument(
         name='model',
