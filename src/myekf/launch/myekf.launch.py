@@ -25,7 +25,7 @@ def generate_launch_description():
     # 路径
     pkg_dir_imu=get_package_share_directory("yesense_std_ros2")
 
-    # launch
+    # launch路径
     imu_launch = os.path.join(
         pkg_dir_imu,"launch","yesense_node.launch.py"
     )
