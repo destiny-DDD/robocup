@@ -1,21 +1,23 @@
 # ============================================================================
-# nav2_params.yaml —— NAV2 参数【真车模式】（配合 mynav.launch.py 使用）
+# nav2_params_sim.yaml —— NAV2 参数【纯仿真模式】（配合 sim_nav.launch.py 使用）
 #
-# 适用场景：实车 + 激光雷达(/scan) + IMU。
-#   - AMCL 用 /scan 做蒙特卡洛定位（发布 map→odom）
-#   - local costmap 用 voxel_layer、global costmap 用 obstacle_layer（激光实时障碍）
-#   - collision_monitor 的 scan 观测启用（实车避障）
+# 适用场景：无实车、无雷达(/scan)、无 IMU。障碍物全部来自静态地图 room.pgm 的代价地图。
 #
-# 注意：这是"实车原版"，仿真请用 nav2_params_sim.yaml，两文件勿混用。
-# 雷达到货后直接：ros2 launch mynav mynav.launch.py
+# 由 nav2_params.yaml 复制而来，仅 4 处改动：
+#   1) local_costmap.plugins : voxel_layer → static_layer   （无激光，局部障碍改用静态地图）
+#   2) global_costmap.plugins : 去掉 obstacle_layer          （无激光实时障碍）
+#   3) 删除 voxel_layer / obstacle_layer 两个参数块
+#   4) collision_monitor.scan.enabled : True → False         （没有 /scan 数据源）
+#
+# 定位：不启动 AMCL，sim_nav.launch.py 发静态 map→odom 单位变换（"完美定位"）。
+# 里程计：mycontrol 的 sub_node 通过 socat 虚拟串口读回自己的 /cmd_vel 积分出 /odom。
+# 其余 amcl / loopback_simulator 段保留但不会被启动（仅与真车文件对齐）。
 # ============================================================================
 
 
-# ---------------- AMCL 蒙特卡洛定位 ----------------
-# 订阅 /scan，粒子滤波估计机器人位姿，发布 map→odom。
-# 依赖激光雷达：没有 /scan 时不工作、不发 map→odom
-#   （仿真时由 sim_nav.launch.py 的静态 map→odom 代替）。
-# scan_topic: 雷达话题名
+# ---------------- AMCL 定位段（仿真不启动）----------------
+# sim_nav.launch.py 不启动 AMCL，改用静态 map→odom 单位变换做"完美定位"。
+# 保留该段仅为了与 nav2_params.yaml（真车）文件结构对齐。
 amcl:
   ros__parameters:
     alpha1: 0.2
@@ -58,7 +60,7 @@ amcl:
 
 
 # ---------------- 行为树导航器 ----------------
-# 接收 rviz "Nav2 Goal" → /navigate_to_pose action，按行为树编排：规划→跟随→(卡住时)恢复。
+# 接收 rviz "Nav2 Goal" → /navigate_to_pose action。
 bt_navigator:
   ros__parameters:
     global_frame: map
@@ -88,10 +90,8 @@ bt_navigator:
 
 
 # ---------------- 控制器 ----------------
-# FollowPath = MPPI 控制器（采样优化的轨迹跟踪），输出 cmd_vel_nav。
+# FollowPath = MPPI 采样优化，输出 cmd_vel_nav。
 # 输出链：cmd_vel_nav → velocity_smoother → cmd_vel_smoothed → collision_monitor → /cmd_vel
-# 关键参数：vx_max=0.5 最大前进速度；xy_goal_tolerance=0.15 到达判定；
-#   progress_checker：10s 内没移动 0.5m 视为卡住（触发恢复行为）。
 controller_server:
   ros__parameters:
     controller_frequency: 20.0
@@ -213,9 +213,9 @@ controller_server:
       #   twirling_cost_weight: 10.0
 
 
-# ---------------- 局部代价地图（3×3m 滚动窗口，odom 系，随车移动）----------------
-# 真车模式：plugins = voxel_layer(激光3D栅格实时避障) + inflation_layer(膨胀)。
-# 注意：无 /scan 时 voxel_layer 是空的——这正是仿真版改用 static_layer 的原因。
+# ---------------- 局部代价地图（3×3m 滚动窗口，odom 系）----------------
+# ★仿真核心改动：plugins = static_layer + inflation_layer。
+# 无激光，局部障碍也来自静态地图；窗口随机器人移动，每帧截取周围 3×3m。
 local_costmap:
   local_costmap:
     ros__parameters:
@@ -228,31 +228,11 @@ local_costmap:
       height: 3
       resolution: 0.05
       robot_radius: 0.12
-      plugins: ["voxel_layer", "inflation_layer"]
+      plugins: ["static_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.30
-      voxel_layer:
-        plugin: "nav2_costmap_2d::VoxelLayer"
-        enabled: True
-        publish_voxel_map: True
-        origin_z: 0.0
-        z_resolution: 0.05
-        z_voxels: 16
-        max_obstacle_height: 2.0
-        mark_threshold: 0
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
@@ -260,8 +240,8 @@ local_costmap:
 
 
 # ---------------- 全局代价地图（map 系，整幅地图）----------------
-# 真车模式：static_layer(room.pgm 静态墙) + obstacle_layer(激光实时障碍) + inflation_layer。
-# 全局规划(planner_server)在这张图上找路径。
+# ★仿真核心改动：去掉 obstacle_layer，只保留 static_layer(room.pgm 墙) + inflation_layer。
+# 全局规划在这张图上找路径，墙就是唯一障碍。
 global_costmap:
   global_costmap:
     ros__parameters:
@@ -272,21 +252,7 @@ global_costmap:
       robot_radius: 0.12
       resolution: 0.05
       track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
+      plugins: ["static_layer", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
@@ -305,7 +271,6 @@ global_costmap:
 
 
 # ---------------- 地图保存工具 ----------------
-# map_saver_cli / nav2_map_server 保存地图时用的阈值参数。
 map_saver:
   ros__parameters:
     save_map_timeout: 5.0
@@ -315,7 +280,7 @@ map_saver:
 
 
 # ---------------- 全局路径规划 ----------------
-# GridBased = NavfnPlanner（栅格 A* 风格），在 global_costmap 上规划 map→目标 的最优路径。
+# GridBased = NavfnPlanner，在 global_costmap 上规划 map→目标 路径。
 planner_server:
   ros__parameters:
     expected_planner_frequency: 20.0
@@ -329,7 +294,6 @@ planner_server:
 
 
 # ---------------- 路径平滑 ----------------
-# 把规划出的折线路径平滑成可跟踪曲线，再交给控制器。
 smoother_server:
   ros__parameters:
     smoother_plugins: ["simple_smoother"]
@@ -341,7 +305,7 @@ smoother_server:
 
 
 # ---------------- 恢复行为 ----------------
-# 导航卡住/失败时的自救动作：spin(原地转)、backup(后退)、assisted_teleop 等。
+# 卡住时 spin(原地转)/backup(后退) 自救。
 behavior_server:
   ros__parameters:
     local_costmap_topic: local_costmap/costmap_raw
@@ -371,7 +335,6 @@ behavior_server:
 
 
 # ---------------- 多点导航 ----------------
-# 依次导航多个航点（/navigate_through_poses 路径）。本次未用，默认配置。
 waypoint_follower:
   ros__parameters:
     loop_rate: 20
@@ -384,8 +347,7 @@ waypoint_follower:
       waypoint_pause_duration: 200
 
 
-# ---------------- 路线导航（可选）----------------
-# 基于 .geojson 路线图的导航；未配置路线图文件，本次不用。
+# ---------------- 路线导航（可选，未配置路线图）----------------
 route_server:
   ros__parameters:
     # The graph_filepath does not need to be specified since it going to be set by defaults in launch.
@@ -411,7 +373,7 @@ route_server:
 
 
 # ---------------- 速度平滑 ----------------
-# 接 cmd_vel_nav，按 max_accel/max_decel 约束输出 cmd_vel_smoothed，防止指令突变。
+# 接 cmd_vel_nav，约束加速度输出 cmd_vel_smoothed。
 velocity_smoother:
   ros__parameters:
     smoothing_frequency: 20.0
@@ -429,8 +391,9 @@ velocity_smoother:
 
 
 # ---------------- 碰撞监控（/cmd_vel 链最后一关）----------------
-# cmd_vel_smoothed 进来 → 检测前方/车身碰撞风险 → 输出 /cmd_vel。
-# 真车模式：scan 观测启用（雷达实时避障）；FootprintApproach 用 local costmap 检测贴墙。
+# ★改动点：scan 观测 enabled: False（没有 /scan，禁掉雷达数据源）。
+# FootprintApproach 保留（enabled: True）：读 local costmap 的静态障碍，
+#   车太贴墙时会把 /cmd_vel 压成 0 或减速。
 collision_monitor:
   ros__parameters:
     base_frame_id: "base_footprint"
@@ -460,11 +423,10 @@ collision_monitor:
       topic: "scan"
       min_height: 0.15
       max_height: 2.0
-      enabled: True
+      enabled: False
 
 
-# ---------------- 充电桩对接 ----------------
-# opennav_docking：自动停靠充电桩。本次未用，默认配置。
+# ---------------- 充电桩对接（仿真不常用）----------------
 docking_server:
   ros__parameters:
     controller_frequency: 50.0
@@ -519,9 +481,8 @@ docking_server:
       dock_collision_threshold: 0.3
 
 
-# ---------------- 回环仿真器 ----------------
-# 造一份假 scan（基于地图）喂给 AMCL，用于无雷达时测定位。
-# 本次仿真模式并未启动它（sim 的定位是静态 map→odom）；真车也不用。
+# ---------------- 回环仿真器（仿真也不启动）----------------
+# 造假 scan 喂 AMCL 用的；本仿真用静态 map→odom 定位，没启动它。
 loopback_simulator:
   ros__parameters:
     base_frame_id: "base_footprint"
