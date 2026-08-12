@@ -23,4 +23,4 @@ if(BUILD_TESTING)
 endif()
 
 set(USE_SCOPED_HEADER_INSTALL_DIR TRUE)
-ament_auto_package(INSTALL_TO_SHARE maps launch)
+ament_auto_package(INSTALL_TO_SHARE maps config launch)

@@ -28,3 +28,5 @@ memcpy(&msg, rx_buf, sizeof(WheelMsg));  // 搬回去
 
 // msg.speed_x 现在就是发端那个 float，值不变
 ```
+
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 map odom
