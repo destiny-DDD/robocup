@@ -1,0 +1,12 @@
+# 多点导航航点列表 —— 按实际地图(room.pgm)调整 x/y/yaw
+frame_id: "map"
+resume_topic: "/nav_resume"
+waypoints:
+  - name: "point1"
+    x: 1.0
+    y: 0.0
+    yaw: 0.0
+  - name: "point2"
+    x: 2.0
+    y: 0.0
+    yaw: 0.0
