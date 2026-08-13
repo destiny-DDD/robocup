@@ -32,10 +32,37 @@ def generate_launch_description():
         launch_arguments={
             'map': amcl_config,
             'params_file': nav_config,
+            'use_localization': 'False',
         }.items()
+    )
+    action_map_server = launch_ros.actions.Node(
+        package='nav2_map_server',
+        executable='map_server',
+        name='map_server',
+        output='screen',
+        parameters=[{'yaml_filename': amcl_config}],
+    )
+    action_lifecycle_map = launch_ros.actions.Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_map',
+        output='screen',
+        parameters=[{'use_sim_time': False},
+                    {'autostart': True},
+                    {'node_names': ['map_server']}],
+    )
+
+    # 4) 完美定位：静态 map = odom
+    action_static_tf = launch_ros.actions.Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
     )
 
     # return
     return launch.LaunchDescription([
+        action_map_server,
+        action_lifecycle_map,
+        action_static_tf,
         action_nav_launch,
     ])
