@@ -21,15 +21,6 @@ class MySer {
 public:
   /// @brief 接收回调：收到数据时调用，buffer 为收到的原始字节
   using RecvCallback = std::function<void(const std::vector<uint8_t> &buffer)>;
-
-private:
-  drivers::common::IoContext io_context_;
-  std::shared_ptr<drivers::serial_driver::SerialDriver> serial_;
-  RecvCallback recv_callback_;
-
-  void do_async_receive();
-
-public:
   /// @param device 串口设备路径
   /// @param baud_rate 波特率
   /// @param threads IO 线程数，0=仅发送，1+=支持异步接收
@@ -41,6 +32,13 @@ public:
 
   /// @brief 启动异步接收，收到数据时回调
   void start_receive(RecvCallback callback);
+
+private:
+  drivers::common::IoContext io_context_;
+  std::shared_ptr<drivers::serial_driver::SerialDriver> serial_;
+  RecvCallback recv_callback_;
+
+  void do_async_receive();
 };
 
 } // namespace control_ser

@@ -16,6 +16,11 @@ struct TFdata {
 };
 
 class MySub : public rclcpp::Node {
+public:
+  MySub(const std::string &name, std::shared_ptr<control_ser::MySer> serial);
+  void TimeCallback();
+  void Init();
+
 private:
   // 串口
   std::shared_ptr<control_ser::MySer> serial_;
@@ -36,11 +41,6 @@ private:
   std::string odom_frame_;
   std::string child_frame_;
   bool tf_yn;
-
-public:
-  MySub(const std::string &name, std::shared_ptr<control_ser::MySer> serial);
-  void TimeCallback();
-  void Init();
 };
 } // namespace control_sub
 

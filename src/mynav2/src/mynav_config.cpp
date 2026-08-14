@@ -14,9 +14,9 @@ nav2_config my_nav2_config(const std::string &file_path) {
     wp.y = node["y"].as<double>();
     wp.yaw = node["yaw"].as<double>();
     points.waypoints.push_back(wp);
-    if (points.waypoints.empty())
-      throw std::runtime_error("waypoints 列表为空");
   }
+  if (points.waypoints.empty())
+    throw std::runtime_error("waypoints 列表为空");
   return points;
 }
 } // namespace mynav_config

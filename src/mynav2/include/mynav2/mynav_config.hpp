@@ -1,3 +1,6 @@
+#ifndef __MYNAV_CONFIG_HPP_
+#define __MYNAV_CONFIG_HPP_
+
 #include <yaml-cpp/yaml.h>
 
 namespace mynav_config {
@@ -18,3 +21,5 @@ struct nav2_config {
 nav2_config my_nav2_config(const std::string &file_path);
 
 } // namespace mynav_config
+
+#endif
