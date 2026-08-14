@@ -35,9 +35,9 @@ public:
     client_ =
         rclcpp_action::create_client<NavigateToPose>(this, "/navigate_to_pose");
     state_client_ =
-        create_client<lifecycle_msgs::srv::GetState>("/bt_navigator/get_state");
-    resume_sub_ = create_subscription<std_msgs::msg::Empty>(
-        cfg_.resume_topic, rclcpp::QoS(10),
+        this->create_client<lifecycle_msgs::srv::GetState>("/bt_navigator/get_state");
+    resume_sub_ = this->create_subscription<std_msgs::msg::Empty>(
+        cfg_.resume_topic, 10,
         [this](std_msgs::msg::Empty::ConstSharedPtr) { resume_signal(); });
 
     RCLCPP_INFO(get_logger(), "已加载 %zu 个航点 (frame=%s, resume=%s)",
