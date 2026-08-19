@@ -15,8 +15,8 @@ find_package(yaml-cpp REQUIRED)
 target_link_libraries(nav2_config ${YAML_CPP_LIBRARIES})
 
 include_directories(include/${PROJECT_NAME})
-# file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-# ament_auto_add_executable(${PROJECT_NAME} ${SRC})
+file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+ament_auto_add_executable(${PROJECT_NAME} ${SRC})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -18,7 +18,7 @@ struct nav2_config {
   std::vector<nav2_point> waypoints;
 };
 
-nav2_config mynav2_config(const std::string &file_path);
+nav2_config my_nav2_config(const std::string &file_path);
 
 } // namespace mynav_config
 

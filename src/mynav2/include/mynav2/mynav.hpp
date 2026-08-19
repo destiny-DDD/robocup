@@ -19,6 +19,7 @@ public:
   bool wait_for_navigator_active();
   geometry_msgs::msg::Quaternion yaw_to_q(double yaw);
   void resume_signal();
+  void wait_for_resume();
 
 private:
   // 配置文件
@@ -29,6 +30,11 @@ private:
       action_client_;
   rclcpp::Client<lifecycle_msgs::srv::GetState>::SharedPtr server_client_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr resume_sub_;
+
+  // 互斥锁
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  bool resume_received_ = false;
 };
 } // namespace mynav
 

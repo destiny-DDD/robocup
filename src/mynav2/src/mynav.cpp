@@ -5,7 +5,7 @@ namespace mynav {
 MyNav::MyNav(const std::string &name) : Node(name) {
   const std::string file =
       declare_parameter<std::string>("waypoint_file"); // 相当于传空字符
-  config_ = mynav_config::mynav2_config(file);
+  config_ = mynav_config::my_nav2_config(file);
 
   action_client_ =
       rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(
@@ -31,6 +31,8 @@ bool MyNav::run() {
     goal.pose.pose.position.x = point_.x;
     goal.pose.pose.position.y = point_.y;
     goal.pose.pose.orientation = yaw_to_q(point_.yaw);
+
+    // 异步获取动作状况
     auto goal_handle_future = action_client_->async_send_goal(
         goal, rclcpp_action::Client<
                   nav2_msgs::action::NavigateToPose>::SendGoalOptions());
@@ -42,7 +44,18 @@ bool MyNav::run() {
       return false; // 被 Ctrl+C 中断，不再等服务器应答
     }
     const auto goal_handle = goal_handle_future.get();
+
+    // 异步等待action结果
+    auto result_future = action_client_->async_get_result(goal_handle);
+    while (rclcpp::ok() && result_future.wait_for(std::chrono::milliseconds(
+                               100)) != std::future_status::ready) {
+    }
+    if (!rclcpp::ok()) {
+      return false; // 被 Ctrl+C 中断：导航进行中，干净退出
+    }
+    wait_for_resume();
   }
+  return true;
 }
 
 geometry_msgs::msg::Quaternion MyNav::yaw_to_q(double yaw) {
@@ -52,7 +65,23 @@ geometry_msgs::msg::Quaternion MyNav::yaw_to_q(double yaw) {
   return q;
 }
 
-void MyNav::resume_signal() {}
+void MyNav::resume_signal() {
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    resume_received_ = true;
+  }
+  cv_.notify_all();
+}
+
+void MyNav::wait_for_resume() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  // 边到边等：只有"开始等待之后"到达的信号才算数（早到信号在此被清零忽略）。
+  // 用 wait_for 轮询 rclcpp::ok()，保证 Ctrl+C 能干净退出。
+  resume_received_ = false;
+  while (!resume_received_ && rclcpp::ok()) {
+    cv_.wait_for(lock, std::chrono::milliseconds(200));
+  }
+}
 
 bool MyNav::wait_for_navigator_active() {
   const auto deadline =
@@ -75,3 +104,15 @@ bool MyNav::wait_for_navigator_active() {
 }
 
 } // namespace mynav
+
+int main(int argc, char **argv) {
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<mynav::MyNav>("runner");
+  std::thread spin_thread([node] { rclcpp::spin(node); });
+  const bool completed = node->run();
+  rclcpp::shutdown();
+  if (spin_thread.joinable()) {
+    spin_thread.join();
+  }
+  return completed ? 0 : 1; // 失败/被中止退出码 1，便于上层感知
+}
