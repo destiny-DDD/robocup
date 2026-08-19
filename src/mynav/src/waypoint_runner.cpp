@@ -23,7 +23,8 @@ namespace mynav {
 class WaypointRunner : public rclcpp::Node {
 public:
   WaypointRunner() : Node("waypoint_runner") {
-    const std::string file = declare_parameter<std::string>("waypoint_file");
+    const std::string file =
+        declare_parameter<std::string>("waypoint_file"); // 相当于传空字符
     try {
       cfg_ = parse_waypoint_config(file);
     } catch (const std::exception &e) {
@@ -34,8 +35,8 @@ public:
 
     client_ =
         rclcpp_action::create_client<NavigateToPose>(this, "/navigate_to_pose");
-    state_client_ =
-        this->create_client<lifecycle_msgs::srv::GetState>("/bt_navigator/get_state");
+    state_client_ = this->create_client<lifecycle_msgs::srv::GetState>(
+        "/bt_navigator/get_state");
     resume_sub_ = this->create_subscription<std_msgs::msg::Empty>(
         cfg_.resume_topic, 10,
         [this](std_msgs::msg::Empty::ConstSharedPtr) { resume_signal(); });
@@ -80,7 +81,9 @@ public:
       goal.pose.pose.orientation = yaw_to_quat(wp.yaw);
 
       auto goal_handle_future = client_->async_send_goal(
-          goal, rclcpp_action::Client<NavigateToPose>::SendGoalOptions());
+          goal,
+          rclcpp_action::Client<NavigateToPose>::
+              SendGoalOptions()); // 括号可以使用回调函数，传空代表用future
       while (rclcpp::ok() &&
              goal_handle_future.wait_for(std::chrono::milliseconds(100)) !=
                  std::future_status::ready) {
@@ -88,13 +91,14 @@ public:
       if (!rclcpp::ok()) {
         return false; // 被 Ctrl+C 中断，不再等服务器应答
       }
-      const auto goal_handle = goal_handle_future.get();
+      const auto goal_handle = goal_handle_future.get(); // 获得句柄
       if (!goal_handle) {
         RCLCPP_ERROR(get_logger(), "航点 %s 目标被服务器拒绝，中止序列",
                      wp.name.c_str());
         return false;
       }
 
+      // 异步等待action结果
       auto result_future = client_->async_get_result(goal_handle);
       while (rclcpp::ok() && result_future.wait_for(std::chrono::milliseconds(
                                  100)) != std::future_status::ready) {

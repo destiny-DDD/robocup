@@ -21,6 +21,7 @@ class MySer {
 public:
   /// @brief 接收回调：收到数据时调用，buffer 为收到的原始字节
   using RecvCallback = std::function<void(const std::vector<uint8_t> &buffer)>;
+  
   /// @param device 串口设备路径
   /// @param baud_rate 波特率
   /// @param threads IO 线程数，0=仅发送，1+=支持异步接收
