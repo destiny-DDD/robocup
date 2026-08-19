@@ -6,12 +6,12 @@ from ament_index_python import get_package_share_directory
 def generate_launch_description():
     # 配置文件
     amcl_config = os.path.join(
-        get_package_share_directory('mynav'),
+        get_package_share_directory('mynav2'),
         'maps',
         'room.yaml',
     )
     nav_config = os.path.join(
-        get_package_share_directory('mynav'),
+        get_package_share_directory('mynav2'),
         'config',
         'nav2_params.yaml',
     )

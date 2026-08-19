@@ -44,8 +44,8 @@ bool MyNav::run() {
     if (!rclcpp::ok()) {
       return false; // 被 Ctrl+C 中断，不再等服务器应答
     }
-    const auto goal_handle = goal_handle_future.get();
 
+    const auto goal_handle = goal_handle_future.get();
     // 异步等待action结果
     auto result_future = action_client_->async_get_result(goal_handle);
     // 真正卡住程序直到动作完成的循环
@@ -55,6 +55,7 @@ bool MyNav::run() {
     if (!rclcpp::ok()) {
       return false; // 被 Ctrl+C 中断：导航进行中，干净退出
     }
+    RCLCPP_INFO(get_logger(), "导航完成");
     wait_for_resume();
   }
   return true;
@@ -109,7 +110,7 @@ bool MyNav::wait_for_navigator_active() {
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<mynav::MyNav>("runner");
+  auto node = std::make_shared<mynav::MyNav>("mynav2");
   std::thread spin_thread([node] { rclcpp::spin(node); });
   const bool completed = node->run();
   rclcpp::shutdown();
