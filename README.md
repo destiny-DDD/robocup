@@ -30,3 +30,5 @@ memcpy(&msg, rx_buf, sizeof(WheelMsg));  // 搬回去
 ```
 
 ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 map odom
+
+ros2 topic pub /nav_resume std_msgs/msg/Empty '{}' --once

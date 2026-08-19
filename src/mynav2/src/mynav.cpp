@@ -32,10 +32,11 @@ bool MyNav::run() {
     goal.pose.pose.position.y = point_.y;
     goal.pose.pose.orientation = yaw_to_q(point_.yaw);
 
-    // 异步获取动作状况
+    // 异步发送动作，循环等待服务器接收
     auto goal_handle_future = action_client_->async_send_goal(
-        goal, rclcpp_action::Client<
-                  nav2_msgs::action::NavigateToPose>::SendGoalOptions());
+        goal, rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::
+                  SendGoalOptions()); // 结构体，里面藏着三个回调
+    // 等待服务端响应
     while (rclcpp::ok() &&
            goal_handle_future.wait_for(std::chrono::milliseconds(100)) !=
                std::future_status::ready) {
@@ -47,6 +48,7 @@ bool MyNav::run() {
 
     // 异步等待action结果
     auto result_future = action_client_->async_get_result(goal_handle);
+    // 真正卡住程序直到动作完成的循环
     while (rclcpp::ok() && result_future.wait_for(std::chrono::milliseconds(
                                100)) != std::future_status::ready) {
     }
