@@ -21,7 +21,7 @@ x10:
       publish_multiecholaserscan: false  # N10Plus 是否发布 MultiEchoLaserScan 数据
       enable_noise_filter: false  # 是否开启孤立噪点滤波 N10Plus不生效
       N10Plus_hz: 10              # N10Plus雷达扫描频率 [6,12]
-      min_range: 0.2             # 雷达扫描最小距离 小于该值的点将被过滤(m)
+      min_range: 0.0             # 雷达扫描最小距离 小于该值的点将被过滤(m)
       max_range: 5.0             # 雷达扫描最大距离 大于该值的点将被过滤(m)
       #不屏蔽角度时 都为0    可以屏蔽单个角度或者多个角度
       #对应位置的角度左值和角度右值之间为屏蔽掉的角度，左值和右值数量必须相等

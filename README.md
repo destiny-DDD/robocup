@@ -32,3 +32,13 @@ memcpy(&msg, rx_buf, sizeof(WheelMsg));  // 搬回去
 ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 map odom
 
 ros2 topic pub /nav_resume std_msgs/msg/Empty '{}' --once
+
+MAKEFLAGS="-j1" colcon build --symlink-install
+
+驱动读的：                    /dev/wheeltec_lidar  ──┐
+                            /dev/wheeltec_IMU   ──┐├─▶ 这两个名字是固定的
+                                                 │
+软链接指向（每次插拔/开机按序列号重新算）：            │
+  雷达(serial 5B8E672279) → wheeltec_lidar → 当前的某个 ttyACM×
+  IMU(serial 0003)        → wheeltec_IMU  → 当前的某个 ttyACM×
+

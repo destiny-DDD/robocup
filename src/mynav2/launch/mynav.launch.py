@@ -21,7 +21,7 @@ def generate_launch_description():
     pkg_dir_nav=get_package_share_directory("nav2_bringup")
 
     # launch路径 bringup_launch.py包括navigation_launch.py和localization_launch.py
-    lidar = os.path.join(
+    lidar_launch = os.path.join(
         pkg_dir_lidar,"launch","lsn10_launch.py"
     )
     nav_launch = os.path.join(
@@ -31,7 +31,7 @@ def generate_launch_description():
     # action
     action_lidar_launch = launch.actions.IncludeLaunchDescription(
         launch.launch_description_sources.PythonLaunchDescriptionSource(
-            nav_launch
+            lidar_launch
         )
     )
     action_nav_launch = launch.actions.IncludeLaunchDescription(
