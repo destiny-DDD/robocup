@@ -17,14 +17,23 @@ def generate_launch_description():
     )
 
     # 路径
+    pkg_dir_lidar=get_package_share_directory("lslidar_driver")
     pkg_dir_nav=get_package_share_directory("nav2_bringup")
 
     # launch路径 bringup_launch.py包括navigation_launch.py和localization_launch.py
+    lidar = os.path.join(
+        pkg_dir_lidar,"launch","lsn10_launch.py"
+    )
     nav_launch = os.path.join(
         pkg_dir_nav,"launch","bringup_launch.py"
     )
 
     # action
+    action_lidar_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(
+            nav_launch
+        )
+    )
     action_nav_launch = launch.actions.IncludeLaunchDescription(
         launch.launch_description_sources.PythonLaunchDescriptionSource(
             nav_launch
@@ -32,7 +41,7 @@ def generate_launch_description():
         launch_arguments={
             'map': amcl_config,
             'params_file': nav_config,
-            'use_localization': 'False',
+            'use_localization': 'True',
         }.items()
     )
     action_map_server = launch_ros.actions.Node(
@@ -61,6 +70,7 @@ def generate_launch_description():
 
     # return
     return launch.LaunchDescription([
+        action_lidar_launch,
         action_map_server,
         action_lifecycle_map,
         action_static_tf,

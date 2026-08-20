@@ -24,7 +24,7 @@ def generate_launch_description():
             nav2_launch
             )
     )
-    action_runner = launch_ros.actions.Node(
+    action_waypoint = launch_ros.actions.Node(
         package='mynav2',
         executable='mynav2',
         output='screen',
@@ -33,5 +33,5 @@ def generate_launch_description():
 
     return launch.LaunchDescription([
         action_nav2,
-        action_runner,
+        action_waypoint,
     ])
