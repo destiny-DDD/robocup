@@ -19,6 +19,7 @@ include_directories(include/${PROJECT_NAME})
 file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 ament_auto_add_executable(${PROJECT_NAME} ${SRC})
 
+# target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS}) 不能记录依赖关系，而且include是隐式添加，我不喜欢
 ament_target_dependencies(${PROJECT_NAME} OpenCV)
 
 if(BUILD_TESTING)
