@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(mynav2)
+project(myvideo)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -10,14 +10,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
-# 为了给mynav_config.cpp链接上yaml-cpp
-ament_auto_add_library(nav2_config src/mynav_config.cpp)
-find_package(yaml-cpp REQUIRED)
-target_link_libraries(nav2_config ${YAML_CPP_LIBRARIES})
+# OpenCV 的 rosdep key 是 libopencv-dev，但 CMake 包名是 OpenCV，
+# 两者不一致，ament_auto_find_build_dependencies 不会自动找到它，
+# 所以这里手动 find_package 并链接
+find_package(OpenCV REQUIRED)
 
 include_directories(include/${PROJECT_NAME})
 file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 ament_auto_add_executable(${PROJECT_NAME} ${SRC})
+
+ament_target_dependencies(${PROJECT_NAME} OpenCV)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -32,4 +34,4 @@ if(BUILD_TESTING)
 endif()
 
 set(USE_SCOPED_HEADER_INSTALL_DIR TRUE)
-ament_auto_package(INSTALL_TO_SHARE maps config launch)
+ament_auto_package(INSTALL_TO_SHARE launch)

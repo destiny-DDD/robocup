@@ -111,7 +111,8 @@ bool MyNav::wait_for_navigator_active() {
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<mynav::MyNav>("mynav2");
-  std::thread spin_thread([node] { rclcpp::spin(node); });
+  std::thread spin_thread(
+      [node] { rclcpp::spin(node); }); // 开线程执行回调，防止卡住run()
   const bool completed = node->run();
   rclcpp::shutdown();
   if (spin_thread.joinable()) {
