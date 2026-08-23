@@ -21,6 +21,8 @@ ament_auto_add_executable(${PROJECT_NAME} ${SRC})
 
 # target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS}) 不能记录依赖关系，而且include是隐式添加，我不喜欢
 ament_target_dependencies(${PROJECT_NAME} OpenCV)
+# 链接 myserial 串口驱动库
+ament_target_dependencies(${PROJECT_NAME} myserial)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

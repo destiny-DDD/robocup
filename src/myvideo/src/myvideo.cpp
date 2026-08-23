@@ -1,4 +1,5 @@
 #include "myvideo.hpp"
+#include "myserial/my_serial.hpp"
 #include <opencv2/highgui.hpp>
 
 namespace myvideo {
@@ -12,6 +13,7 @@ MyVideo::MyVideo(const std::string &name) : Node(name) {
   timer_ = this->create_wall_timer(std::chrono::milliseconds(30),
                                    [this]() { TimeCallback(); });
 }
+
 void MyVideo::TimeCallback() {
   cap.read(image_origin);
   cv::imshow("img", image_origin);

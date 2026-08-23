@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(mycontrol)
+project(myserial)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -11,11 +11,8 @@ find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
 include_directories(include/${PROJECT_NAME})
-file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-ament_auto_add_executable(${PROJECT_NAME} ${SRC})
-
-# 链接 myserial 串口驱动库
-ament_target_dependencies(${PROJECT_NAME} myserial)
+# 串口驱动编译成库，供 mycontrol / myvideo 等包链接
+ament_auto_add_library(${PROJECT_NAME} src/my_serial.cpp)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -30,4 +27,4 @@ if(BUILD_TESTING)
 endif()
 
 set(USE_SCOPED_HEADER_INSTALL_DIR TRUE)
-ament_auto_package(INSTALL_TO_SHARE config launch)
+ament_auto_package()
