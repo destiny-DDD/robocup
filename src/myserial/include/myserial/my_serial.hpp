@@ -44,8 +44,10 @@ private:
   drivers::common::IoContext io_context_;
   std::shared_ptr<drivers::serial_driver::SerialDriver> serial_;
   RecvCallback recv_callback_;
+  std::vector<uint8_t> rx_buffer_; // 累积接收缓冲：来多少攒多少，凑够一帧再拆
 
   void do_async_receive();
+  void parse_frames(); // 滑动窗口：从累积缓冲里拆出完整一帧
 };
 
 } // namespace ser

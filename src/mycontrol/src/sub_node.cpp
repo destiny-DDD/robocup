@@ -7,12 +7,8 @@ MySub::MySub(const std::string &name, std::shared_ptr<ser::MySer> serial)
   odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
   tf_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
   serial_->start_receive([this](const std::vector<uint8_t> &buffer) {
-    if (buffer.size() < sizeof(ser::WheelMsg)) {
-      RCLCPP_WARN(this->get_logger(), "收到不完整数据: %zu 字节",
-                  buffer.size());
-      return;
-    }
-    std::memcpy(&msg, buffer.data(), sizeof(msg)); // 把数据存到msg里
+    // parse_frames 已经保证 buffer 是完整且校验通过的一帧，直接拷贝
+    std::memcpy(&msg, buffer.data(), sizeof(msg)); // 拷20个数据存到msg里
     RCLCPP_INFO(this->get_logger(), "收到: x=%.2f y=%.2f z=%.2f", msg.speed_x,
                 msg.speed_y, msg.ang_z);
   });
