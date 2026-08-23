@@ -2,7 +2,7 @@
 
 namespace control_pub {
 MyPub::MyPub(const std::string &name,
-             std::shared_ptr<control_ser::MySer> serial)
+             std::shared_ptr<ser::MySer> serial)
     : Node(name), serial_(std::move(serial)) {
   sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
       "/cmd_vel", 10, [this](const geometry_msgs::msg::Twist::SharedPtr msg) {

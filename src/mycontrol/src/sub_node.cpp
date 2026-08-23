@@ -1,14 +1,13 @@
 #include "sub_node.hpp"
 
 namespace control_sub {
-MySub::MySub(const std::string &name,
-             std::shared_ptr<control_ser::MySer> serial)
+MySub::MySub(const std::string &name, std::shared_ptr<ser::MySer> serial)
     : Node(name), serial_(std::move(serial)) {
   Init();
   odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
   tf_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
   serial_->start_receive([this](const std::vector<uint8_t> &buffer) {
-    if (buffer.size() < sizeof(control_ser::WheelMsg)) {
+    if (buffer.size() < sizeof(ser::WheelMsg)) {
       RCLCPP_WARN(this->get_logger(), "收到不完整数据: %zu 字节",
                   buffer.size());
       return;

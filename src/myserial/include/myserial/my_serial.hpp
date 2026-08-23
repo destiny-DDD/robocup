@@ -7,7 +7,7 @@
 #include <memory>
 #include <serial_driver/serial_driver.hpp>
 
-namespace control_ser {
+namespace ser {
 
 struct WheelMsg {
   uint8_t header[2] = {0xAA, 0xBB};
@@ -17,11 +17,17 @@ struct WheelMsg {
   uint8_t header2 = 0xCC;
 };
 
+struct VideoMsg {
+  uint8_t header[2] = {0x11, 0x22};
+
+  uint8_t header2 = 0x33;
+};
+
 class MySer {
 public:
   /// @brief 接收回调：收到数据时调用，buffer 为收到的原始字节
   using RecvCallback = std::function<void(const std::vector<uint8_t> &buffer)>;
-  
+
   /// @param device 串口设备路径
   /// @param baud_rate 波特率
   /// @param threads IO 线程数，0=仅发送，1+=支持异步接收
@@ -42,6 +48,6 @@ private:
   void do_async_receive();
 };
 
-} // namespace control_ser
+} // namespace ser
 
 #endif

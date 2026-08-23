@@ -17,14 +17,14 @@ struct TFdata {
 
 class MySub : public rclcpp::Node {
 public:
-  MySub(const std::string &name, std::shared_ptr<control_ser::MySer> serial);
+  MySub(const std::string &name, std::shared_ptr<ser::MySer> serial);
   void TimeCallback();
   void Init();
 
 private:
   // 串口
-  std::shared_ptr<control_ser::MySer> serial_;
-  control_ser::WheelMsg msg;
+  std::shared_ptr<ser::MySer> serial_;
+  ser::WheelMsg msg;
   // timer
   rclcpp::Time last_time_;
   rclcpp::Time now_time_;

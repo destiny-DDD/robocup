@@ -1,7 +1,7 @@
 #include "my_serial.hpp"
 #include <rclcpp/rclcpp.hpp>
 
-namespace control_ser {
+namespace ser {
 
 MySer::MySer(const std::string &device, uint32_t baud_rate, size_t threads)
     : io_context_(threads) {
@@ -54,4 +54,4 @@ void MySer::do_async_receive() {
       });
 }
 
-} // namespace control_ser
+} // namespace ser
