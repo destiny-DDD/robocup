@@ -15,6 +15,10 @@ ament_auto_find_build_dependencies()
 # 所以这里手动 find_package 并链接
 find_package(OpenCV REQUIRED)
 
+# tesseract 同样没有 CMake 包名，只有 pkg-config 名，用 pkg_check_modules 找
+find_package(PkgConfig REQUIRED) # 找到pkg_check_modules
+pkg_check_modules(TESSERACT REQUIRED IMPORTED_TARGET tesseract)
+
 include_directories(include/${PROJECT_NAME})
 file(GLOB_RECURSE SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 ament_auto_add_executable(${PROJECT_NAME} ${SRC})
@@ -23,6 +27,8 @@ ament_auto_add_executable(${PROJECT_NAME} ${SRC})
 ament_target_dependencies(${PROJECT_NAME} OpenCV)
 # 链接 myserial 串口驱动库
 ament_target_dependencies(${PROJECT_NAME} myserial)
+# 链接 tesseract OCR 库
+target_link_libraries(${PROJECT_NAME} PkgConfig::TESSERACT)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
