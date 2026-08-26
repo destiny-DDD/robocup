@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 
 namespace myvideo {
@@ -35,8 +36,24 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 
   cap.open(2);
 
-  timer_ = this->create_wall_timer(std::chrono::milliseconds(30),
-                                   [this]() { TimeCallback(); });
+  serial_->start_receive([this](const std::vector<uint8_t> &buffer) {
+    if (buffer.size() != sizeof(ser::VideoMsg)) {
+      return; // MySer 也可能收到其他类型的串口帧
+    }
+
+    ser::VideoMsg command;
+    std::memcpy(&command, buffer.data(), sizeof(command));
+    if (command.num != 1 && command.num != 2) {
+      RCLCPP_WARN(this->get_logger(), "忽略无效的video模式: %u",
+                  static_cast<unsigned>(command.num));
+      return;
+    }
+
+    num.store(static_cast<int>(command.num),
+              std::memory_order_relaxed); // 原子写入
+    RCLCPP_INFO(this->get_logger(), "串口切换video模式: %d",
+                num.load(std::memory_order_relaxed));
+  });
 }
 
 MyVideo::~MyVideo() { cv::destroyAllWindows(); }
@@ -148,13 +165,17 @@ bool MyVideo::FindBestTemplate(const cv::Mat &gray, MatchResult &best) const {
   return found;
 }
 
-void MyVideo::TimeCallback() {
+void MyVideo::run1() {
   if (!cap.read(image_origin) || image_origin.empty()) {
     return;
   }
 
-  cv::Mat gray;
+  cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(27, 27));
+
+  cv::Mat gray, binary, opened;
   cv::cvtColor(image_origin, gray, cv::COLOR_BGR2GRAY);
+  cv::threshold(gray, binary, 200, 255, cv::THRESH_BINARY);
+  cv::morphologyEx(binary, opened, cv::MORPH_OPEN, kernel);
 
   ++fps_frame_count_;
   ++match_frame_count_;
@@ -162,7 +183,7 @@ void MyVideo::TimeCallback() {
     match_frame_count_ = 0;
 
     MatchResult best;
-    if (FindBestTemplate(gray, best) && best.score >= kMatchThreshold) {
+    if (FindBestTemplate(binary, best) && best.score >= kMatchThreshold) {
       if (best.name == candidate_name_) {
         ++candidate_count_;
       } else {
@@ -194,18 +215,26 @@ void MyVideo::TimeCallback() {
   }
 
   const std::string fps_text = "FPS: " + cv::format("%.2f", fps_);
-  cv::putText(gray, fps_text, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX,
-              1.0, cv::Scalar(255), 2);
-  cv::imshow("img", gray);
+  cv::putText(gray, fps_text, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX, 1.0,
+              cv::Scalar(255), 2);
+  cv::imshow("img", opened);
   cv::waitKey(1);
 }
 } // namespace myvideo
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
-  auto video_tx = std::make_shared<ser::MySer>("/dev/ttyUSB0", 115200, 0);
+  auto video_tx = std::make_shared<ser::MySer>("/dev/ttyUSB0", 115200, 1);
   auto node = std::make_shared<myvideo::MyVideo>("myvideo", video_tx);
-  rclcpp::spin(node);
+  while (rclcpp::ok()) {
+    switch (node->num.load(std::memory_order_relaxed)) {
+    case 1:
+      node->run1();
+      break;
+    case 2:
+      break;
+    }
+  }
   rclcpp::shutdown();
   return 0;
 }

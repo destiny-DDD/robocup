@@ -2,6 +2,7 @@
 #define __MYVIDEO_HPP_
 
 #include "myserial/my_serial.hpp"
+#include <atomic>
 #include "rclcpp/rclcpp.hpp"
 #include <chrono>
 #include <opencv2/opencv.hpp>
@@ -11,12 +12,13 @@
 namespace myvideo {
 class MyVideo : public rclcpp::Node {
 public:
+  std::atomic<int> num{1};
   MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial);
   ~MyVideo();
   void TimeCallback();
+  void run1();
 
 private:
-  rclcpp::TimerBase::SharedPtr timer_;
   std::shared_ptr<ser::MySer> serial_;
 
   // 帧率

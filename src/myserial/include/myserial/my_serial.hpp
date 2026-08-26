@@ -19,9 +19,11 @@ struct WheelMsg {
 
 struct VideoMsg {
   uint8_t header[2] = {0x11, 0x22};
-
+  uint8_t num = 1;
   uint8_t header2 = 0x33;
 };
+
+static_assert(sizeof(VideoMsg) == 4, "VideoMsg must be a 4-byte frame");
 
 class MySer {
 public:
@@ -36,6 +38,9 @@ public:
 
   /// @brief 阻塞发送 WheelMsg
   size_t send(const WheelMsg &msg);
+
+  /// @brief 阻塞发送 VideoMsg
+  size_t send(const VideoMsg &msg);
 
   /// @brief 启动异步接收，收到数据时回调
   void start_receive(RecvCallback callback);
