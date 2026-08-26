@@ -2,8 +2,8 @@
 #define __MYVIDEO_HPP_
 
 #include "myserial/my_serial.hpp"
-#include <atomic>
 #include "rclcpp/rclcpp.hpp"
+#include <atomic>
 #include <chrono>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -17,6 +17,7 @@ public:
   ~MyVideo();
   void TimeCallback();
   void run1();
+  void run2();
 
 private:
   std::shared_ptr<ser::MySer> serial_;
@@ -51,7 +52,7 @@ private:
   double template_scale_min_ = 0.8;
   double template_scale_max_ = 1.2;
   double template_scale_step_ = 0.2;
-  int match_max_width_ = 480;
+  int match_max_width_ = 640;
 
   // TM_CCOEFF_NORMED 的分数越接近 1 越相似，实际阈值需按现场画面调整。
   static constexpr double kMatchThreshold = 0.80; // 阈值

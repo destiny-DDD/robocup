@@ -29,7 +29,7 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
   }
   if (match_max_width_ <= 0) {
     RCLCPP_WARN(this->get_logger(), "match_max_width 必须大于 0，使用 640");
-    match_max_width_ = 480;
+    match_max_width_ = 640;
   }
 
   LoadTemplates();
@@ -57,6 +57,97 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 }
 
 MyVideo::~MyVideo() { cv::destroyAllWindows(); }
+
+void MyVideo::run1() {
+  if (!cap.read(image_origin) || image_origin.empty()) {
+    return;
+  }
+
+  cv::Mat hsv;
+  cv::cvtColor(image_origin, hsv, cv::COLOR_BGR2HSV);
+
+  struct ColorRange {
+    const char *name;
+    cv::Scalar lower;
+    cv::Scalar upper;
+    cv::Scalar draw_color;
+  };
+
+  // OpenCV 的 HSV 色调范围为 0 到 179；红色跨过 0，需要合并两段范围。
+  const std::array<ColorRange, 3> colors = {
+      ColorRange{"RED", cv::Scalar(0, 100, 80), cv::Scalar(10, 255, 255),
+                  cv::Scalar(0, 0, 255)},
+      ColorRange{"BLUE", cv::Scalar(90, 100, 60), cv::Scalar(130, 255, 255),
+                  cv::Scalar(255, 0, 0)},
+      ColorRange{"YELLOW", cv::Scalar(18, 100, 80), cv::Scalar(38, 255, 255),
+                  cv::Scalar(0, 255, 255)}};
+
+  const cv::Mat kernel = cv::getStructuringElement(
+      cv::MORPH_ELLIPSE, cv::Size(5, 5));
+  constexpr double kMinArea = 150.0;
+  constexpr double kMinRadius = 6.0;
+  constexpr double kMinCircularity = 0.45;
+  std::array<int, colors.size()> counts{};
+
+  for (size_t color_index = 0; color_index < colors.size(); ++color_index) {
+    const auto &color = colors[color_index];
+    cv::Mat mask;
+    cv::inRange(hsv, color.lower, color.upper, mask);
+
+    if (color_index == 0) {
+      cv::Mat red_wrap;
+      cv::inRange(hsv, cv::Scalar(170, 100, 80),
+                  cv::Scalar(179, 255, 255), red_wrap);
+      cv::bitwise_or(mask, red_wrap, mask);
+    }
+
+    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL,
+                     cv::CHAIN_APPROX_SIMPLE);
+    for (const auto &contour : contours) {
+      const double area = cv::contourArea(contour);
+      if (area < kMinArea) {
+        continue;
+      }
+
+      const double perimeter = cv::arcLength(contour, true);
+      if (perimeter <= 0.0) {
+        continue;
+      }
+      const double circularity =
+          4.0 * CV_PI * area / (perimeter * perimeter);
+      if (circularity < kMinCircularity) {
+        continue;
+      }
+
+      cv::Point2f center;
+      float radius = 0.0F;
+      cv::minEnclosingCircle(contour, center, radius);
+      if (radius < kMinRadius) {
+        continue;
+      }
+
+      cv::circle(image_origin, center, static_cast<int>(radius),
+                 color.draw_color, 2);
+      cv::putText(image_origin, color.name,
+                  cv::Point(static_cast<int>(center.x - radius),
+                            static_cast<int>(center.y - radius - 5)),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.6, color.draw_color, 2);
+      ++counts[color_index];
+    }
+  }
+
+  const std::string count_text =
+      cv::format("RED: %d  BLUE: %d  YELLOW: %d", counts[0], counts[1],
+                 counts[2]);
+  cv::putText(image_origin, count_text, cv::Point(20, 35),
+              cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 2);
+  cv::imshow("img", image_origin);
+  cv::waitKey(1);
+}
 
 void MyVideo::LoadTemplates() {
   std::string image_dir;
@@ -165,7 +256,7 @@ bool MyVideo::FindBestTemplate(const cv::Mat &gray, MatchResult &best) const {
   return found;
 }
 
-void MyVideo::run1() {
+void MyVideo::run2() {
   if (!cap.read(image_origin) || image_origin.empty()) {
     return;
   }
@@ -215,9 +306,9 @@ void MyVideo::run1() {
   }
 
   const std::string fps_text = "FPS: " + cv::format("%.2f", fps_);
-  cv::putText(gray, fps_text, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX, 1.0,
-              cv::Scalar(255), 2);
-  cv::imshow("img", opened);
+  cv::putText(image_origin, fps_text, cv::Point(20, 40),
+              cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 0), 2);
+  cv::imshow("img", image_origin);
   cv::waitKey(1);
 }
 } // namespace myvideo
@@ -229,9 +320,10 @@ int main(int argc, char **argv) {
   while (rclcpp::ok()) {
     switch (node->num.load(std::memory_order_relaxed)) {
     case 1:
-      node->run1();
+      node->run1(); // 原子读取
       break;
     case 2:
+      node->run2();
       break;
     }
   }
