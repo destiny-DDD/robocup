@@ -5,10 +5,10 @@ from ament_index_python import get_package_share_directory
 
 def generate_launch_description():
     # 命令行
-    setup_cmd=launch.actions.ExecuteProcess(
-        cmd=['socat','-d','-d','pty,raw,echo=0,link=/tmp/vtx','pty,raw,echo=0,link=/tmp/vrx'],
-        output='screen'
-    )
+    # setup_cmd=launch.actions.ExecuteProcess(
+    #     cmd=['socat','-d','-d','pty,raw,echo=0,link=/tmp/vtx','pty,raw,echo=0,link=/tmp/vrx'],
+    #     output='screen'
+    # )
 
     # 配置文件
     config = os.path.join(
@@ -50,7 +50,7 @@ def generate_launch_description():
 
     # return
     return launch.LaunchDescription([
-        setup_cmd,
+        # setup_cmd,
         action_mycontrol,
         action_imu_launch,
         action_ekf,

@@ -4,7 +4,7 @@ x10:
       lidar_type: "X10"           # 雷达类型
       lidar_model: "N10"          # 雷达型号 M10 M10GPS M10P N10 N10Plus N301
       # serial_port: ""             # 雷达连接串口名称 使用网口请将值改为空
-      serial_port: "/dev/wheeltec_lidar"             # 雷达连接串口名称 使用网口请将值改为空
+      serial_port: "/dev/wheel_lidar"             # 雷达连接串口名称 使用网口请将值改为空
       device_ip: "192.168.1.200"  # 雷达IP地址
       msop_port: 2368             # 雷达目的数据端口
       difop_port: 2369            # 雷达目的设备端口
@@ -27,8 +27,8 @@ x10:
       #对应位置的角度左值和角度右值之间为屏蔽掉的角度，左值和右值数量必须相等
       #angle_disable_min: [-6000,12000]      #雷达扫描最小角度裁剪 单位 0.01°
       #angle_disable_max: [6000,24000]       #雷达扫描最大角度裁剪 单位 0.01°
-      angle_disable_min: [0]      #雷达扫描最小角度裁剪 单位 0.01°
-      angle_disable_max: [0]      #雷达扫描最大角度裁剪 单位 0.01°
+      angle_disable_min: [12000]      #雷达扫描最小角度裁剪 单位 0.01°
+      angle_disable_max: [21000]      #雷达扫描最大角度裁剪 单位 0.01°
       # 点云坐标系转换参数
       is_pretreatment: false      # 预处理开关 仅对点云生效
       x_offset: 0.0               # X轴平移(m)
