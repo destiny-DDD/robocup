@@ -43,4 +43,4 @@ if(BUILD_TESTING)
 endif()
 
 set(USE_SCOPED_HEADER_INSTALL_DIR TRUE)
-ament_auto_package()
+ament_auto_package(INSTALL_TO_SHARE image)
