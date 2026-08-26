@@ -24,7 +24,6 @@ private:
       std::chrono::steady_clock::now();
   int fps_frame_count_ = 0;
   double fps_ = 0.0;
-  int match_frame_count_ = 0;
 
   struct TemplateImage {
     std::string name;
@@ -50,11 +49,12 @@ private:
   double template_scale_min_ = 0.8;
   double template_scale_max_ = 1.2;
   double template_scale_step_ = 0.2;
-  int match_max_width_ = 640;
+  int match_max_width_ = 480;
 
   // TM_CCOEFF_NORMED 的分数越接近 1 越相似，实际阈值需按现场画面调整。
   static constexpr double kMatchThreshold = 0.80; // 阈值
   static constexpr int kMatchInterval = 5;
+  int match_frame_count_ = 0;
   static constexpr int kStableFrames = 3;
   std::string candidate_name_;
   int candidate_count_ = 0;

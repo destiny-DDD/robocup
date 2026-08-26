@@ -28,7 +28,7 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
   }
   if (match_max_width_ <= 0) {
     RCLCPP_WARN(this->get_logger(), "match_max_width 必须大于 0，使用 640");
-    match_max_width_ = 640;
+    match_max_width_ = 480;
   }
 
   LoadTemplates();
@@ -153,28 +153,16 @@ void MyVideo::TimeCallback() {
     return;
   }
 
-  ++fps_frame_count_;
+  cv::Mat gray;
+  cv::cvtColor(image_origin, gray, cv::COLOR_BGR2GRAY);
 
+  ++fps_frame_count_;
   ++match_frame_count_;
   if (match_frame_count_ >= kMatchInterval) {
     match_frame_count_ = 0;
 
-    cv::Mat gray, binary;
-    cv::cvtColor(image_origin, gray, cv::COLOR_BGR2GRAY);
-    cv::threshold(gray, binary, 127, 255, cv::THRESH_BINARY);
-
     MatchResult best;
     if (FindBestTemplate(gray, best) && best.score >= kMatchThreshold) {
-      // best.location 是整张图中的左上角坐标，不需要再加 ROI 偏移。
-      // 创建矩形框
-      const cv::Rect box(best.location, best.size);
-      cv::rectangle(image_origin, box, cv::Scalar(0, 255, 0), 2);
-
-      const std::string text =
-          best.name + " " + cv::format("%.2f", best.score);
-      cv::putText(image_origin, text, best.location + cv::Point(0, -8),
-                  cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
-
       if (best.name == candidate_name_) {
         ++candidate_count_;
       } else {
@@ -182,8 +170,7 @@ void MyVideo::TimeCallback() {
         candidate_count_ = 1;
       }
 
-      if (candidate_count_ >= kStableFrames &&
-          confirmed_name_ != best.name) {
+      if (candidate_count_ >= kStableFrames && confirmed_name_ != best.name) {
         confirmed_name_ = best.name;
         RCLCPP_INFO(this->get_logger(), "模板匹配确认: %s (score=%.3f)",
                     confirmed_name_.c_str(), best.score);
@@ -207,9 +194,9 @@ void MyVideo::TimeCallback() {
   }
 
   const std::string fps_text = "FPS: " + cv::format("%.2f", fps_);
-  cv::putText(image_origin, fps_text, cv::Point(20, 40),
-              cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 0), 2);
-  cv::imshow("img", image_origin);
+  cv::putText(gray, fps_text, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX,
+              1.0, cv::Scalar(255), 2);
+  cv::imshow("img", gray);
   cv::waitKey(1);
 }
 } // namespace myvideo
