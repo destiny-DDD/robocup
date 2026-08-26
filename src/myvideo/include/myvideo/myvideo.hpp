@@ -12,21 +12,15 @@
 namespace myvideo {
 class MyVideo : public rclcpp::Node {
 public:
-  std::atomic<int> num{1};
+  std::atomic<int> num{2};
   MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial);
   ~MyVideo();
   void TimeCallback();
-  void run1();
-  void run2();
+  bool run1();
+  bool run2();
 
 private:
   std::shared_ptr<ser::MySer> serial_;
-
-  // 帧率
-  std::chrono::steady_clock::time_point fps_start_time_ =
-      std::chrono::steady_clock::now();
-  int fps_frame_count_ = 0;
-  double fps_ = 0.0;
 
   struct TemplateImage {
     std::string name;

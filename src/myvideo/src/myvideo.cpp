@@ -6,6 +6,14 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <thread>
+
+/*
+S 小：接近灰色、白色、黑色，颜色不明显；
+S 大：颜色更纯、更鲜艳。
+V 小：暗处、阴影、黑色；
+V 大：明亮区域。
+*/
 
 namespace myvideo {
 MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
@@ -18,19 +26,6 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
                                                          template_scale_step_);
   match_max_width_ =
       this->declare_parameter<int>("match_max_width", match_max_width_);
-
-  if (template_scale_min_ <= 0.0 || template_scale_max_ < template_scale_min_ ||
-      template_scale_step_ <= 0.0) {
-    RCLCPP_WARN(this->get_logger(),
-                "无效的模板缩放参数，使用默认范围 0.6 到 1.4，步长 0.1");
-    template_scale_min_ = 0.6;
-    template_scale_max_ = 1.4;
-    template_scale_step_ = 0.1;
-  }
-  if (match_max_width_ <= 0) {
-    RCLCPP_WARN(this->get_logger(), "match_max_width 必须大于 0，使用 640");
-    match_max_width_ = 640;
-  }
 
   LoadTemplates();
 
@@ -58,9 +53,9 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 
 MyVideo::~MyVideo() { cv::destroyAllWindows(); }
 
-void MyVideo::run1() {
+bool MyVideo::run1() {
   if (!cap.read(image_origin) || image_origin.empty()) {
-    return;
+    return false;
   }
 
   cv::Mat hsv;
@@ -68,43 +63,45 @@ void MyVideo::run1() {
 
   struct ColorRange {
     const char *name;
-    cv::Scalar lower;
-    cv::Scalar upper;
-    cv::Scalar draw_color;
+    cv::Scalar lower;      // HSV 下限
+    cv::Scalar upper;      // HSV 上限
+    cv::Scalar draw_color; // BGR 绘图颜色
   };
 
   // OpenCV 的 HSV 色调范围为 0 到 179；红色跨过 0，需要合并两段范围。
   const std::array<ColorRange, 3> colors = {
       ColorRange{"RED", cv::Scalar(0, 100, 80), cv::Scalar(10, 255, 255),
-                  cv::Scalar(0, 0, 255)},
+                 cv::Scalar(0, 0, 255)},
       ColorRange{"BLUE", cv::Scalar(90, 100, 60), cv::Scalar(130, 255, 255),
-                  cv::Scalar(255, 0, 0)},
+                 cv::Scalar(255, 0, 0)},
       ColorRange{"YELLOW", cv::Scalar(18, 100, 80), cv::Scalar(38, 255, 255),
-                  cv::Scalar(0, 255, 255)}};
+                 cv::Scalar(0, 255, 255)}};
 
-  const cv::Mat kernel = cv::getStructuringElement(
-      cv::MORPH_ELLIPSE, cv::Size(5, 5));
+  // 椭圆形
+  const cv::Mat kernel =
+      cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
   constexpr double kMinArea = 150.0;
   constexpr double kMinRadius = 6.0;
-  constexpr double kMinCircularity = 0.45;
+  constexpr double kMinCircularity = 0.7;
   std::array<int, colors.size()> counts{};
 
   for (size_t color_index = 0; color_index < colors.size(); ++color_index) {
     const auto &color = colors[color_index];
-    cv::Mat mask;
+    cv::Mat mask; // 输出掩码，黑白图，白色为符合的地方
     cv::inRange(hsv, color.lower, color.upper, mask);
 
     if (color_index == 0) {
       cv::Mat red_wrap;
-      cv::inRange(hsv, cv::Scalar(170, 100, 80),
-                  cv::Scalar(179, 255, 255), red_wrap);
+      cv::inRange(hsv, cv::Scalar(170, 100, 80), cv::Scalar(179, 255, 255),
+                  red_wrap);
       cv::bitwise_or(mask, red_wrap, mask);
     }
 
     cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
     cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
 
-    std::vector<std::vector<cv::Point>> contours;
+    std::vector<std::vector<cv::Point>>
+        contours; // 可储存多个轮廓，轮廓里面有多个点
     cv::findContours(mask, contours, cv::RETR_EXTERNAL,
                      cv::CHAIN_APPROX_SIMPLE);
     for (const auto &contour : contours) {
@@ -113,40 +110,42 @@ void MyVideo::run1() {
         continue;
       }
 
-      const double perimeter = cv::arcLength(contour, true);
+      const double perimeter =
+          cv::arcLength(contour, true); // 计算轮廓周长，true代表闭合曲线
       if (perimeter <= 0.0) {
         continue;
       }
       const double circularity =
-          4.0 * CV_PI * area / (perimeter * perimeter);
+          4.0 * CV_PI * area /
+          (perimeter * perimeter); // 圆形度 4π × 面积 / 周长²
       if (circularity < kMinCircularity) {
         continue;
       }
 
       cv::Point2f center;
       float radius = 0.0F;
-      cv::minEnclosingCircle(contour, center, radius);
+      cv::minEnclosingCircle(contour, center, radius); // 计算最小外接圆
       if (radius < kMinRadius) {
         continue;
       }
 
       cv::circle(image_origin, center, static_cast<int>(radius),
-                 color.draw_color, 2);
+                 color.draw_color, 2); // 画圆
       cv::putText(image_origin, color.name,
                   cv::Point(static_cast<int>(center.x - radius),
                             static_cast<int>(center.y - radius - 5)),
                   cv::FONT_HERSHEY_SIMPLEX, 0.6, color.draw_color, 2);
-      ++counts[color_index];
+      ++counts[color_index]; // 每检测到颜色，计数+1
     }
   }
 
-  const std::string count_text =
-      cv::format("RED: %d  BLUE: %d  YELLOW: %d", counts[0], counts[1],
-                 counts[2]);
+  const std::string count_text = cv::format("RED: %d  BLUE: %d  YELLOW: %d",
+                                            counts[0], counts[1], counts[2]);
   cv::putText(image_origin, count_text, cv::Point(20, 35),
               cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 2);
   cv::imshow("img", image_origin);
   cv::waitKey(1);
+  return true;
 }
 
 void MyVideo::LoadTemplates() {
@@ -256,11 +255,12 @@ bool MyVideo::FindBestTemplate(const cv::Mat &gray, MatchResult &best) const {
   return found;
 }
 
-void MyVideo::run2() {
+bool MyVideo::run2() {
   if (!cap.read(image_origin) || image_origin.empty()) {
-    return;
+    return false;
   }
 
+  // 矩形
   cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(27, 27));
 
   cv::Mat gray, binary, opened;
@@ -268,7 +268,6 @@ void MyVideo::run2() {
   cv::threshold(gray, binary, 200, 255, cv::THRESH_BINARY);
   cv::morphologyEx(binary, opened, cv::MORPH_OPEN, kernel);
 
-  ++fps_frame_count_;
   ++match_frame_count_;
   if (match_frame_count_ >= kMatchInterval) {
     match_frame_count_ = 0;
@@ -294,22 +293,9 @@ void MyVideo::run2() {
     }
   }
 
-  const auto now = std::chrono::steady_clock::now();
-  const double elapsed =
-      std::chrono::duration<double>(now - fps_start_time_).count();
-
-  if (elapsed >= 1.0) {
-    fps_ = fps_frame_count_ / elapsed;
-
-    fps_frame_count_ = 0;
-    fps_start_time_ = now;
-  }
-
-  const std::string fps_text = "FPS: " + cv::format("%.2f", fps_);
-  cv::putText(image_origin, fps_text, cv::Point(20, 40),
-              cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 0), 2);
   cv::imshow("img", image_origin);
   cv::waitKey(1);
+  return true;
 }
 } // namespace myvideo
 
@@ -317,14 +303,34 @@ int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   auto video_tx = std::make_shared<ser::MySer>("/dev/ttyUSB0", 115200, 1);
   auto node = std::make_shared<myvideo::MyVideo>("myvideo", video_tx);
+  auto fps_start = std::chrono::steady_clock::now();
+  std::size_t frame_count = 0;
   while (rclcpp::ok()) {
+    bool frame_processed = false;
     switch (node->num.load(std::memory_order_relaxed)) {
     case 1:
-      node->run1(); // 原子读取
+      frame_processed = node->run1();
       break;
     case 2:
-      node->run2();
+      frame_processed = node->run2();
       break;
+    default:
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      break;
+    }
+
+    if (frame_processed) {
+      ++frame_count;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    const double elapsed =
+        std::chrono::duration<double>(now - fps_start).count();
+    if (elapsed >= 1.0) {
+      RCLCPP_INFO(node->get_logger(), "处理帧率: %.2f FPS",
+                  static_cast<double>(frame_count) / elapsed);
+      frame_count = 0;
+      fps_start = now;
     }
   }
   rclcpp::shutdown();
