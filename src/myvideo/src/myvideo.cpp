@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <opencv2/imgproc.hpp>
 #include <thread>
 
 namespace myvideo {
@@ -21,13 +22,13 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
       this->declare_parameter<int>("match_max_width", match_max_width_);
   tesseract_language_ = this->declare_parameter<std::string>(
       "tesseract_language", tesseract_language_);
-  tesseract_psm_ = this->declare_parameter<int>("tesseract_psm", tesseract_psm_);
-  show_window_ =
-      this->declare_parameter<bool>("show_window", HasDisplay());
+  tesseract_psm_ =
+      this->declare_parameter<int>("tesseract_psm", tesseract_psm_);
+  show_window_ = this->declare_parameter<bool>("show_window", HasDisplay());
 
   LoadTemplates();
 
-  cap.open(0);
+  cap.open(2);
 
   serial_->start_receive([this](const std::vector<uint8_t> &buffer) {
     if (buffer.size() != sizeof(ser::VideoMsg)) {
@@ -322,6 +323,7 @@ bool MyVideo::InitTesseract() {
 
   tesseract_initialized_ = true;
   tesseract_ = std::make_unique<tesseract::TessBaseAPI>();
+  // 初始化tesseract，0为成功
   if (tesseract_->Init(nullptr, tesseract_language_.c_str()) != 0) {
     RCLCPP_ERROR(this->get_logger(),
                  "Tesseract 初始化失败 (language=%s)，请安装对应的 traineddata",
@@ -337,11 +339,12 @@ bool MyVideo::InitTesseract() {
     tesseract_psm_ = 10;
   }
   tesseract_->SetPageSegMode(
-      static_cast<tesseract::PageSegMode>(tesseract_psm_));
-  tesseract_->SetVariable("user_defined_dpi", "300");
-  tesseract_->SetVariable("tessedit_char_whitelist", "ABCD");
+      static_cast<tesseract::PageSegMode>(tesseract_psm_));   // 设置模式
+  tesseract_->SetVariable("user_defined_dpi", "600");         // 设置300dpi
+  tesseract_->SetVariable("tessedit_char_whitelist", "ABCD"); // 设置只识别ABCD
   tesseract_->SetVariable("load_system_dawg", "F");
-  tesseract_->SetVariable("load_freq_dawg", "F");
+  tesseract_->SetVariable("load_freq_dawg",
+                          "F"); // 关闭词典，更适合识别单个字母
   RCLCPP_INFO(this->get_logger(), "Tesseract 已初始化 (language=%s, psm=%d)",
               tesseract_language_.c_str(), tesseract_psm_);
   return true;
@@ -358,16 +361,19 @@ bool MyVideo::run3() {
     return true;
   }
 
+  cv::Mat kernel_open = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7, 7));
+  cv::Mat kernel_close = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
   cv::Mat gray;
   cv::cvtColor(image_origin, gray, cv::COLOR_BGR2GRAY);
   cv::Mat prepared;
   cv::resize(gray, prepared, cv::Size(), 2.0, 2.0, cv::INTER_CUBIC);
-  cv::threshold(prepared, prepared, 0, 255,
-                cv::THRESH_BINARY | cv::THRESH_OTSU);
+  cv::threshold(prepared, prepared, 200, 255, cv::THRESH_BINARY);
+  cv::morphologyEx(prepared, prepared, cv::MORPH_OPEN, kernel_open);
+  cv::morphologyEx(prepared, prepared, cv::MORPH_CLOSE, kernel_close);
 
   tesseract_->SetImage(prepared.data, prepared.cols, prepared.rows, 1,
-                       static_cast<int>(prepared.step));
-  char *raw_text = tesseract_->GetUTF8Text();
+                       static_cast<int>(prepared.step)); // 提供图像
+  char *raw_text = tesseract_->GetUTF8Text();            // 识别字母
   std::string text = raw_text != nullptr ? raw_text : "";
   delete[] raw_text;
 
@@ -386,6 +392,54 @@ bool MyVideo::run3() {
     } else {
       RCLCPP_INFO(this->get_logger(), "Tesseract: %s", normalized.c_str());
     }
+  }
+
+  // Tesseract 的字符坐标对应 prepared（放大后的图像），绘制到原图前需要缩回去。
+  const double scale_x = static_cast<double>(prepared.cols) /
+                         static_cast<double>(image_origin.cols);
+  const double scale_y = static_cast<double>(prepared.rows) /
+                         static_cast<double>(image_origin.rows);
+  auto clamp_coordinate = [](int value, int upper_bound) {
+    return std::max(0, std::min(value, upper_bound - 1));
+  };
+  std::unique_ptr<tesseract::ResultIterator> iterator(
+      tesseract_->GetIterator()); // 结果的迭代器
+  if (iterator != nullptr) {
+    iterator->Begin();
+    do {
+      char *raw_symbol = iterator->GetUTF8Text(tesseract::RIL_SYMBOL);
+      const std::string symbol = raw_symbol != nullptr ? raw_symbol : "";
+      delete[] raw_symbol;
+
+      const bool is_target =
+          symbol.size() == 1 && (symbol[0] == 'A' || symbol[0] == 'B' ||
+                                 symbol[0] == 'C' || symbol[0] == 'D');
+      if (!is_target) {
+        continue;
+      }
+
+      int left = 0;
+      int top = 0;
+      int right = 0;
+      int bottom = 0;
+      if (!iterator->BoundingBox(tesseract::RIL_SYMBOL, &left, &top, &right,
+                                 &bottom)) {
+        continue;
+      }
+
+      const int x1 = clamp_coordinate(
+          static_cast<int>(std::lround(left / scale_x)), image_origin.cols);
+      const int y1 = clamp_coordinate(
+          static_cast<int>(std::lround(top / scale_y)), image_origin.rows);
+      const int x2 = clamp_coordinate(
+          static_cast<int>(std::lround(right / scale_x)), image_origin.cols);
+      const int y2 = clamp_coordinate(
+          static_cast<int>(std::lround(bottom / scale_y)), image_origin.rows);
+      if (x2 > x1 && y2 > y1) {
+        cv::rectangle(image_origin, cv::Point(x1, y1), cv::Point(x2, y2),
+                      cv::Scalar(0, 0, 255), 2);
+      }
+    } while (iterator->Next(tesseract::RIL_SYMBOL));
   }
 
   const std::string display_text =
