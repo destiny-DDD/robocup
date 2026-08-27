@@ -8,13 +8,6 @@
 #include <filesystem>
 #include <thread>
 
-/*
-S 小：接近灰色、白色、黑色，颜色不明显；
-S 大：颜色更纯、更鲜艳。
-V 小：暗处、阴影、黑色；
-V 大：明亮区域。
-*/
-
 namespace myvideo {
 MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
     : Node(name), serial_(std::move(serial)) {
@@ -26,6 +19,9 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
                                                          template_scale_step_);
   match_max_width_ =
       this->declare_parameter<int>("match_max_width", match_max_width_);
+  tesseract_language_ = this->declare_parameter<std::string>(
+      "tesseract_language", tesseract_language_);
+  tesseract_psm_ = this->declare_parameter<int>("tesseract_psm", tesseract_psm_);
 
   LoadTemplates();
 
@@ -38,7 +34,7 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 
     ser::VideoMsg command;
     std::memcpy(&command, buffer.data(), sizeof(command));
-    if (command.num != 1 && command.num != 2) {
+    if (command.num < 1 || command.num > 3) {
       RCLCPP_WARN(this->get_logger(), "忽略无效的video模式: %u",
                   static_cast<unsigned>(command.num));
       return;
@@ -53,12 +49,20 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 
 MyVideo::~MyVideo() { cv::destroyAllWindows(); }
 
+/*
+S 小：接近灰色、白色、黑色，颜色不明显；
+S 大：颜色更纯、更鲜艳。
+V 小：暗处、阴影、黑色；
+V 大：明亮区域。
+*/
+
 bool MyVideo::run1() {
   if (!cap.read(image_origin) || image_origin.empty()) {
     return false;
   }
 
   cv::Mat hsv;
+  cv::Mat mask; // 输出掩码，黑白图，白色为符合的地方
   cv::cvtColor(image_origin, hsv, cv::COLOR_BGR2HSV);
 
   struct ColorRange {
@@ -70,29 +74,28 @@ bool MyVideo::run1() {
 
   // OpenCV 的 HSV 色调范围为 0 到 179；红色跨过 0，需要合并两段范围。
   const std::array<ColorRange, 3> colors = {
-      ColorRange{"RED", cv::Scalar(0, 100, 80), cv::Scalar(10, 255, 255),
+      ColorRange{"RED", cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255),
                  cv::Scalar(0, 0, 255)},
-      ColorRange{"BLUE", cv::Scalar(90, 100, 60), cv::Scalar(130, 255, 255),
+      ColorRange{"BLUE", cv::Scalar(100, 120, 70), cv::Scalar(130, 255, 255),
                  cv::Scalar(255, 0, 0)},
-      ColorRange{"YELLOW", cv::Scalar(18, 100, 80), cv::Scalar(38, 255, 255),
+      ColorRange{"YELLOW", cv::Scalar(20, 50, 50), cv::Scalar(35, 255, 255),
                  cv::Scalar(0, 255, 255)}};
 
   // 椭圆形
   const cv::Mat kernel =
-      cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
-  constexpr double kMinArea = 150.0;
-  constexpr double kMinRadius = 6.0;
-  constexpr double kMinCircularity = 0.7;
+      cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(21, 21));
+  constexpr double kMinArea = 1000.0;
+  constexpr double kMinRadius = 50.0;
+  constexpr double kMinCircularity = 0.5;
   std::array<int, colors.size()> counts{};
 
   for (size_t color_index = 0; color_index < colors.size(); ++color_index) {
     const auto &color = colors[color_index];
-    cv::Mat mask; // 输出掩码，黑白图，白色为符合的地方
     cv::inRange(hsv, color.lower, color.upper, mask);
 
     if (color_index == 0) {
       cv::Mat red_wrap;
-      cv::inRange(hsv, cv::Scalar(170, 100, 80), cv::Scalar(179, 255, 255),
+      cv::inRange(hsv, cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255),
                   red_wrap);
       cv::bitwise_or(mask, red_wrap, mask);
     }
@@ -144,6 +147,7 @@ bool MyVideo::run1() {
   cv::putText(image_origin, count_text, cv::Point(20, 35),
               cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 2);
   cv::imshow("img", image_origin);
+  cv::imshow("image",mask);
   cv::waitKey(1);
   return true;
 }
@@ -297,6 +301,91 @@ bool MyVideo::run2() {
   cv::waitKey(1);
   return true;
 }
+
+bool MyVideo::InitTesseract() {
+  if (tesseract_initialized_) {
+    return tesseract_ != nullptr;
+  }
+
+  tesseract_initialized_ = true;
+  tesseract_ = std::make_unique<tesseract::TessBaseAPI>();
+  if (tesseract_->Init(nullptr, tesseract_language_.c_str()) != 0) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Tesseract 初始化失败 (language=%s)，请安装对应的 traineddata",
+                 tesseract_language_.c_str());
+    tesseract_.reset();
+    return false;
+  }
+
+  if (tesseract_psm_ < static_cast<int>(tesseract::PSM_OSD_ONLY) ||
+      tesseract_psm_ > static_cast<int>(tesseract::PSM_RAW_LINE)) {
+    RCLCPP_WARN(this->get_logger(), "无效的 tesseract_psm=%d，使用 PSM 10",
+                tesseract_psm_);
+    tesseract_psm_ = 10;
+  }
+  tesseract_->SetPageSegMode(
+      static_cast<tesseract::PageSegMode>(tesseract_psm_));
+  tesseract_->SetVariable("user_defined_dpi", "300");
+  tesseract_->SetVariable("tessedit_char_whitelist", "ABCD");
+  tesseract_->SetVariable("load_system_dawg", "F");
+  tesseract_->SetVariable("load_freq_dawg", "F");
+  RCLCPP_INFO(this->get_logger(), "Tesseract 已初始化 (language=%s, psm=%d)",
+              tesseract_language_.c_str(), tesseract_psm_);
+  return true;
+}
+
+bool MyVideo::run3() {
+  if (!cap.read(image_origin) || image_origin.empty()) {
+    return false;
+  }
+  if (!InitTesseract()) {
+    cv::putText(image_origin, "Tesseract unavailable", cv::Point(20, 35),
+                cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
+    cv::imshow("img", image_origin);
+    cv::waitKey(1);
+    return true;
+  }
+
+  cv::Mat gray;
+  cv::cvtColor(image_origin, gray, cv::COLOR_BGR2GRAY);
+  cv::Mat prepared;
+  cv::resize(gray, prepared, cv::Size(), 2.0, 2.0, cv::INTER_CUBIC);
+  cv::threshold(prepared, prepared, 0, 255,
+                cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+  tesseract_->SetImage(prepared.data, prepared.cols, prepared.rows, 1,
+                       static_cast<int>(prepared.step));
+  char *raw_text = tesseract_->GetUTF8Text();
+  std::string text = raw_text != nullptr ? raw_text : "";
+  delete[] raw_text;
+
+  // 只保留目标字符，避免 OCR 偶尔返回标点、数字或小写字母。
+  std::string normalized;
+  for (const char character : text) {
+    if (character == 'A' || character == 'B' || character == 'C' ||
+        character == 'D') {
+      normalized += character;
+    }
+  }
+  if (normalized != last_ocr_text_) {
+    last_ocr_text_ = normalized;
+    if (normalized.empty()) {
+      RCLCPP_INFO(this->get_logger(), "Tesseract 未识别到文本");
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Tesseract: %s", normalized.c_str());
+    }
+  }
+
+  const std::string display_text =
+      normalized.empty() ? "(no text)" : normalized.substr(0, 120);
+  cv::putText(image_origin, display_text, cv::Point(20, 35),
+              cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+  cv::imshow("img", image_origin);
+  cv::imshow("ocr", prepared);
+  cv::waitKey(1);
+  return true;
+}
+
 } // namespace myvideo
 
 int main(int argc, char **argv) {
@@ -313,6 +402,9 @@ int main(int argc, char **argv) {
       break;
     case 2:
       frame_processed = node->run2();
+      break;
+    case 3:
+      frame_processed = node->run3();
       break;
     default:
       std::this_thread::sleep_for(std::chrono::milliseconds(50));

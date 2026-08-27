@@ -3,8 +3,10 @@
 
 #include "myserial/my_serial.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include <tesseract/baseapi.h>
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
@@ -12,12 +14,13 @@
 namespace myvideo {
 class MyVideo : public rclcpp::Node {
 public:
-  std::atomic<int> num{2};
+  std::atomic<int> num{3};
   MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial);
   ~MyVideo();
   void TimeCallback();
   bool run1();
   bool run2();
+  bool run3();
 
 private:
   std::shared_ptr<ser::MySer> serial_;
@@ -36,6 +39,7 @@ private:
 
   void LoadTemplates();
   bool FindBestTemplate(const cv::Mat &gray, MatchResult &best) const;
+  bool InitTesseract();
 
   cv::VideoCapture cap;
   cv::Mat image_origin;
@@ -43,8 +47,8 @@ private:
   std::vector<TemplateImage> templates_; // 模板
 
   // 在多个缩放比例下匹配模板，以适应摄像头与目标距离的变化。
-  double template_scale_min_ = 0.8;
-  double template_scale_max_ = 1.2;
+  double template_scale_min_ = 0.2;
+  double template_scale_max_ = 1.8;
   double template_scale_step_ = 0.2;
   int match_max_width_ = 640;
 
@@ -56,6 +60,13 @@ private:
   std::string candidate_name_;
   int candidate_count_ = 0;
   std::string confirmed_name_;
+
+  std::unique_ptr<tesseract::TessBaseAPI> tesseract_;
+  std::string tesseract_language_ = "eng";
+  // PSM 10 适合当前每帧识别一个 A/B/C/D 字符的场景。
+  int tesseract_psm_ = 10;
+  bool tesseract_initialized_ = false;
+  std::string last_ocr_text_;
 };
 
 } // namespace myvideo

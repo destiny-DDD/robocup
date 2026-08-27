@@ -13,6 +13,8 @@
   <depend>rclcpp</depend>
   <depend>ament_index_cpp</depend>
   <depend>libopencv-dev</depend>
+  <depend>libtesseract</depend>
+  <depend>tesseract-ocr</depend>
   <depend>myserial</depend>
 
   <test_depend>ament_lint_auto</test_depend>
