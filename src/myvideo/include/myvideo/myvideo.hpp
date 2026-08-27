@@ -6,6 +6,7 @@
 #include <tesseract/baseapi.h>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <memory>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -43,6 +44,12 @@ private:
 
   cv::VideoCapture cap;
   cv::Mat image_origin;
+
+  // 有 X 显示时才弹窗口（OpenCV Qt 走 xcb 后端，需要 DISPLAY）。
+  // 无显示环境（如 SSH 运行）跳过 imshow/waitKey，避免节点崩溃。
+  bool show_window_ = false;
+  static bool HasDisplay();
+  void ShowWindow(const std::string &name, const cv::Mat &image);
 
   std::vector<TemplateImage> templates_; // 模板
 

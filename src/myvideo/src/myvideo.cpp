@@ -22,10 +22,12 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
   tesseract_language_ = this->declare_parameter<std::string>(
       "tesseract_language", tesseract_language_);
   tesseract_psm_ = this->declare_parameter<int>("tesseract_psm", tesseract_psm_);
+  show_window_ =
+      this->declare_parameter<bool>("show_window", HasDisplay());
 
   LoadTemplates();
 
-  cap.open(2);
+  cap.open(0);
 
   serial_->start_receive([this](const std::vector<uint8_t> &buffer) {
     if (buffer.size() != sizeof(ser::VideoMsg)) {
@@ -48,6 +50,19 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 }
 
 MyVideo::~MyVideo() { cv::destroyAllWindows(); }
+
+bool MyVideo::HasDisplay() {
+  const char *const display = std::getenv("DISPLAY");
+  return display != nullptr && *display != '\0';
+}
+
+void MyVideo::ShowWindow(const std::string &name, const cv::Mat &image) {
+  if (!show_window_) {
+    return;
+  }
+  cv::imshow(name, image);
+  cv::waitKey(1);
+}
 
 /*
 S 小：接近灰色、白色、黑色，颜色不明显；
@@ -146,9 +161,8 @@ bool MyVideo::run1() {
                                             counts[0], counts[1], counts[2]);
   cv::putText(image_origin, count_text, cv::Point(20, 35),
               cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 2);
-  cv::imshow("img", image_origin);
-  cv::imshow("image",mask);
-  cv::waitKey(1);
+  ShowWindow("img", image_origin);
+  ShowWindow("image", mask);
   return true;
 }
 
@@ -297,8 +311,7 @@ bool MyVideo::run2() {
     }
   }
 
-  cv::imshow("img", image_origin);
-  cv::waitKey(1);
+  ShowWindow("img", image_origin);
   return true;
 }
 
@@ -341,8 +354,7 @@ bool MyVideo::run3() {
   if (!InitTesseract()) {
     cv::putText(image_origin, "Tesseract unavailable", cv::Point(20, 35),
                 cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
-    cv::imshow("img", image_origin);
-    cv::waitKey(1);
+    ShowWindow("img", image_origin);
     return true;
   }
 
@@ -380,9 +392,8 @@ bool MyVideo::run3() {
       normalized.empty() ? "(no text)" : normalized.substr(0, 120);
   cv::putText(image_origin, display_text, cv::Point(20, 35),
               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
-  cv::imshow("img", image_origin);
-  cv::imshow("ocr", prepared);
-  cv::waitKey(1);
+  ShowWindow("img", image_origin);
+  ShowWindow("ocr", prepared);
   return true;
 }
 
