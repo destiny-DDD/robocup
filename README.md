@@ -42,3 +42,6 @@ MAKEFLAGS="-j1" colcon build --symlink-install
   雷达(serial 5B8E672279) → wheeltec_lidar → 当前的某个 ttyACM×
   IMU(serial 0003)        → wheeltec_IMU  → 当前的某个 ttyACM×
 
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=false
+
+ros2 run nav2_map_server map_saver_cli -f ~/robocup/src/mynav2/maps

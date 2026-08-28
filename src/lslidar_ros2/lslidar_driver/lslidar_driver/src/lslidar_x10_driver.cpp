@@ -228,7 +228,7 @@ namespace lslidar_driver {
         // create the sin and cos table for different azimuth values
         for (int j = 0; j < 36000; ++j) {
             float angle = static_cast<float>(j) * 0.01f * DEG_TO_RAD;
-            sin_azimuth_table[j] = sinf(angle);
+            sin_azimuth_table[j] = sinf(-angle);  // N10方位角顺时针递增，取负修正点云Y镜像
             cos_azimuth_table[j] = cosf(angle);
         }
         return true;
@@ -413,7 +413,7 @@ namespace lslidar_driver {
                 continue;
             }
 
-            double angle = atan2(-(*iter_y), *iter_x);
+            double angle = atan2(*iter_y, *iter_x);
             if (angle < output_scan.angle_min || angle > output_scan.angle_max) {
                 RCLCPP_DEBUG(node_->get_logger(), "rejected for angle %f not in range (%f, %f)\n", angle,
                              output_scan.angle_min, output_scan.angle_max);
