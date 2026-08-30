@@ -71,7 +71,7 @@
         # geometry_msgs/TwistWithCovarianceStamped、sensor_msgs/Imu）的任意数量的输入。
         # 要添加输入，只需在其"基础"名称后追加序列中的下一个数字，例如 odom0、odom1、twist0、
         # twist1、imu0、imu1、imu2 等。值为话题名称。这些参数没有默认值，必须指定。
-        odom0: /odom
+        odom0: /odom_rf2o
 
         # 每个传感器读数会更新滤波器的部分或全部状态。以下选项用于精确控制每个测量值中的哪些
         # 变量输入滤波器。例如，如果有一个里程计消息作为输入，但只想使用其中的 Z 位置值，
@@ -84,9 +84,9 @@
         # 注意：某些消息类型不提供滤波器估计的全部状态变量。例如，TwistWithCovarianceStamped
         # 消息没有位姿信息，因此前六个值在这种情况下无意义。每个向量的默认值均为 false，
         # 因此该参数对每个传感器实际上都是必填项。
-        odom0_config: [false, false, false,
+        odom0_config: [true, true, false,
                        false, false, false,
-                       true, false, false,
+                       false, false, false,
                        false, false, false,
                        false, false, false]
 

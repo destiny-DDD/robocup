@@ -24,10 +24,10 @@ def generate_launch_description():
                 parameters=[{
                     'laser_scan_topic' : '/scan', #读取雷达数据
                     'odom_topic' : '/odom_rf2o', #输出里程计话题
-                    'publish_tf' : True, #是否发布TF
+                    'publish_tf' : False, #是否发布TF
                     'base_frame_id' : 'base_footprint', #机器人主题坐标系
                     'odom_frame_id' : 'odom', #里程计坐标系
                     'init_pose_from_topic' : '',
-                    'freq' : 20.0}], #rf2o计算频率
+                    'freq' : 10.0}], #rf2o计算频率
             ),
     ])
