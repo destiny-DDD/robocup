@@ -2,6 +2,7 @@
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -26,6 +27,19 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
       this->declare_parameter<int>("tesseract_psm", tesseract_psm_);
   show_window_ = this->declare_parameter<bool>("show_window", HasDisplay());
 
+  svm_model_path_ = this->declare_parameter<std::string>("svm_model_path", "");
+  white_s_min_ = this->declare_parameter<int>("white_s_min", white_s_min_);
+  white_v_min_ = this->declare_parameter<int>("white_v_min", white_v_min_);
+  white_v_max_ = this->declare_parameter<int>("white_v_max", white_v_max_);
+  white_min_area_ =
+      this->declare_parameter<int>("white_min_area", white_min_area_);
+  white_min_fill_ =
+      this->declare_parameter<double>("white_min_fill", white_min_fill_);
+  black_threshold_ =
+      this->declare_parameter<int>("black_threshold", black_threshold_);
+  black_min_area_ =
+      this->declare_parameter<int>("black_min_area", black_min_area_);
+
   LoadTemplates();
 
   cap.open(2);
@@ -37,7 +51,7 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 
     ser::VideoMsg command;
     std::memcpy(&command, buffer.data(), sizeof(command));
-    if (command.num < 1 || command.num > 3) {
+    if (command.num < 1 || command.num > 4) {
       RCLCPP_WARN(this->get_logger(), "忽略无效的video模式: %u",
                   static_cast<unsigned>(command.num));
       return;
@@ -48,6 +62,8 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
     RCLCPP_INFO(this->get_logger(), "串口切换video模式: %d",
                 num.load(std::memory_order_relaxed));
   });
+
+  InitHogSvm();
 }
 
 MyVideo::~MyVideo() { cv::destroyAllWindows(); }
@@ -451,6 +467,224 @@ bool MyVideo::run3() {
   return true;
 }
 
+bool MyVideo::InitHogSvm() {
+  if (hog_svm_initialized_) {
+    return hog_svm_ != nullptr;
+  }
+  hog_svm_initialized_ = true;
+
+  if (svm_model_path_.empty()) {
+    try {
+      svm_model_path_ =
+          (std::filesystem::path(ament_index_cpp::get_package_share_directory(
+                                    "myvideo")) /
+           "model" / "abcd_hog_svm.yml")
+              .string();
+    } catch (const std::exception &error) {
+      RCLCPP_ERROR(this->get_logger(), "无法解析 SVM 模型路径: %s",
+                   error.what());
+      return false;
+    }
+  }
+
+  try {
+    hog_svm_ = cv::ml::SVM::load(svm_model_path_);
+  } catch (const cv::Exception &error) {
+    RCLCPP_ERROR(this->get_logger(), "SVM 模型加载失败 (%s): %s",
+                 svm_model_path_.c_str(), error.what());
+    hog_svm_.release();
+    return false;
+  }
+  if (hog_svm_.empty()) {
+    RCLCPP_ERROR(this->get_logger(), "SVM 模型为空: %s",
+                 svm_model_path_.c_str());
+    return false;
+  }
+  RCLCPP_INFO(this->get_logger(), "已加载 HOG+SVM 模型: %s",
+              svm_model_path_.c_str());
+  return true;
+}
+
+bool MyVideo::NormalizeCharacter(const cv::Mat &character_mask,
+                                 cv::Mat &normalized) const {
+  if (character_mask.empty() || character_mask.type() != CV_8UC1) {
+    return false;
+  }
+
+  std::vector<std::vector<cv::Point>> contours;
+  cv::findContours(character_mask, contours, cv::RETR_EXTERNAL,
+                   cv::CHAIN_APPROX_SIMPLE);
+  double largest_area = 0.0;
+  cv::Rect best_rect;
+  for (const auto &contour : contours) {
+    const double area = cv::contourArea(contour);
+    if (area >= static_cast<double>(black_min_area_) && area > largest_area) {
+      largest_area = area;
+      best_rect = cv::boundingRect(contour);
+    }
+  }
+  if (largest_area <= 0.0 || best_rect.width < 2 || best_rect.height < 2) {
+    return false;
+  }
+
+  const cv::Mat cropped = character_mask(best_rect);
+  const int side = std::max(cropped.cols, cropped.rows) + 8;
+  cv::Mat canvas = cv::Mat::zeros(side, side, CV_8UC1);
+  const int x = (side - cropped.cols) / 2;
+  const int y = (side - cropped.rows) / 2;
+  cropped.copyTo(canvas(cv::Rect(x, y, cropped.cols, cropped.rows)));
+  cv::resize(canvas, normalized, cv::Size(64, 64), 0.0, 0.0,
+             cv::INTER_AREA);
+  return true;
+}
+
+bool MyVideo::ExtractHog(const cv::Mat &normalized, cv::Mat &features) const {
+  if (normalized.empty() || normalized.size() != cv::Size(64, 64) ||
+      normalized.type() != CV_8UC1) {
+    return false;
+  }
+  std::vector<float> descriptor;
+  hog_.compute(normalized, descriptor, cv::Size(8, 8), cv::Size(0, 0));
+  if (descriptor.empty()) {
+    return false;
+  }
+  features = cv::Mat(1, static_cast<int>(descriptor.size()), CV_32F);
+  std::memcpy(features.ptr<float>(), descriptor.data(),
+              descriptor.size() * sizeof(float));
+  return true;
+}
+
+bool MyVideo::run4() {
+  if (!cap.read(image_origin) || image_origin.empty()) {
+    return false;
+  }
+
+  if (!InitHogSvm()) {
+    cv::putText(image_origin, "SVM unavailable", cv::Point(20, 35),
+                cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
+    ShowWindow("img", image_origin);
+    return true;
+  }
+
+  cv::Mat hsv;
+  cv::cvtColor(image_origin, hsv, cv::COLOR_BGR2HSV);
+  cv::Mat white_mask;
+  const int saturation_max = std::clamp(white_s_min_, 0, 255);
+  const int value_min = std::clamp(white_v_min_, 0, 255);
+  const int value_max =
+      std::max(value_min, std::clamp(white_v_max_, 0, 255));
+  cv::inRange(hsv, cv::Scalar(0, 0, value_min),
+              cv::Scalar(179, saturation_max, value_max),
+              white_mask);
+  const cv::Mat close_kernel =
+      cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
+  cv::morphologyEx(white_mask, white_mask, cv::MORPH_CLOSE, close_kernel);
+
+  struct BlockCandidate {
+    cv::Rect rect;
+    double area;
+  };
+  std::vector<std::vector<cv::Point>> block_contours;
+  cv::findContours(white_mask, block_contours, cv::RETR_EXTERNAL,
+                   cv::CHAIN_APPROX_SIMPLE);
+  std::vector<BlockCandidate> blocks;
+  for (const auto &contour : block_contours) {
+    const double area = cv::contourArea(contour);
+    const cv::Rect rect = cv::boundingRect(contour);
+    if (area < static_cast<double>(white_min_area_) || rect.width < 10 ||
+        rect.height < 10) {
+      continue;
+    }
+    const double fill = area / static_cast<double>(rect.area());
+    const double ratio = static_cast<double>(rect.width) / rect.height;
+    if (fill < white_min_fill_ || ratio < 0.2 || ratio > 5.0) {
+      continue;
+    }
+    blocks.push_back({rect, area});
+  }
+  std::sort(blocks.begin(), blocks.end(),
+            [](const BlockCandidate &left, const BlockCandidate &right) {
+              if (left.area != right.area) {
+                return left.area > right.area;
+              }
+              if (left.rect.y != right.rect.y) {
+                return left.rect.y < right.rect.y;
+              }
+              return left.rect.x < right.rect.x;
+            });
+
+  std::string predicted;
+  cv::Rect selected_block;
+  cv::Rect selected_letter;
+  for (const auto &block : blocks) {
+    const cv::Rect frame_rect(0, 0, image_origin.cols, image_origin.rows);
+    const cv::Rect roi_rect = block.rect & frame_rect;
+    const cv::Mat roi = image_origin(roi_rect);
+    cv::Mat gray;
+    cv::cvtColor(roi, gray, cv::COLOR_BGR2GRAY);
+    cv::Mat black_mask;
+    cv::threshold(gray, black_mask, std::clamp(black_threshold_, 0, 255),
+                  255, cv::THRESH_BINARY_INV);
+    cv::morphologyEx(black_mask, black_mask, cv::MORPH_OPEN,
+                     cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+    cv::Mat normalized;
+    if (!NormalizeCharacter(black_mask, normalized)) {
+      continue;
+    }
+    cv::Mat features;
+    if (!ExtractHog(normalized, features)) {
+      continue;
+    }
+    const int label = static_cast<int>(std::lround(hog_svm_->predict(features)));
+    if (label < 0 || label > 3) {
+      continue;
+    }
+    predicted = std::string(1, static_cast<char>('A' + label));
+    selected_block = roi_rect;
+
+    std::vector<std::vector<cv::Point>> letter_contours;
+    cv::findContours(black_mask, letter_contours, cv::RETR_EXTERNAL,
+                     cv::CHAIN_APPROX_SIMPLE);
+    double largest = 0.0;
+    for (const auto &contour : letter_contours) {
+      if (cv::contourArea(contour) > largest) {
+        largest = cv::contourArea(contour);
+        selected_letter = cv::boundingRect(contour);
+      }
+    }
+    selected_letter.x += roi_rect.x;
+    selected_letter.y += roi_rect.y;
+    break;
+  }
+
+  if (predicted.empty()) {
+    letter_candidate_.clear();
+    letter_confirmed_.clear();
+    letter_stable_count_ = 0;
+  } else if (predicted == letter_candidate_) {
+    ++letter_stable_count_;
+    if (letter_stable_count_ >= kLetterStableFrames) {
+      letter_confirmed_ = predicted;
+    }
+  } else {
+    letter_candidate_ = predicted;
+    letter_stable_count_ = 1;
+  }
+
+  if (selected_block.area() > 0) {
+    cv::rectangle(image_origin, selected_block, cv::Scalar(255, 0, 0), 2);
+  }
+  if (selected_letter.area() > 0) {
+    cv::rectangle(image_origin, selected_letter, cv::Scalar(0, 0, 255), 2);
+  }
+  const std::string display =
+      letter_confirmed_.empty() ? "LETTER: ?" : "LETTER: " + letter_confirmed_;
+  cv::putText(image_origin, display, cv::Point(20, 35),
+              cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
+  ShowWindow("img", image_origin);
+  return true;
+}
+
 } // namespace myvideo
 
 int main(int argc, char **argv) {
@@ -470,6 +704,9 @@ int main(int argc, char **argv) {
       break;
     case 3:
       frame_processed = node->run3();
+      break;
+    case 4:
+      frame_processed = node->run4();
       break;
     default:
       std::this_thread::sleep_for(std::chrono::milliseconds(50));

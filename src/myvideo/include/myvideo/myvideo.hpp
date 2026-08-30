@@ -22,6 +22,7 @@ public:
   bool run1();
   bool run2();
   bool run3();
+  bool run4();
 
 private:
   std::shared_ptr<ser::MySer> serial_;
@@ -41,6 +42,10 @@ private:
   void LoadTemplates();
   bool FindBestTemplate(const cv::Mat &gray, MatchResult &best) const;
   bool InitTesseract();
+  bool InitHogSvm();
+  bool NormalizeCharacter(const cv::Mat &character_mask,
+                          cv::Mat &normalized) const;
+  bool ExtractHog(const cv::Mat &normalized, cv::Mat &features) const;
 
   cv::VideoCapture cap;
   cv::Mat image_origin;
@@ -74,6 +79,23 @@ private:
   int tesseract_psm_ = 10;
   bool tesseract_initialized_ = false;
   std::string last_ocr_text_;
+
+  cv::HOGDescriptor hog_{cv::Size(64, 64), cv::Size(16, 16), cv::Size(8, 8),
+                         cv::Size(8, 8), 9};
+  cv::Ptr<cv::ml::SVM> hog_svm_;
+  bool hog_svm_initialized_ = false;
+  std::string svm_model_path_;
+  int white_s_min_ = 60;
+  int white_v_min_ = 150;
+  int white_v_max_ = 255;
+  int white_min_area_ = 1500;
+  double white_min_fill_ = 0.35;
+  int black_threshold_ = 180;
+  int black_min_area_ = 40;
+  int letter_stable_count_ = 0;
+  std::string letter_candidate_;
+  std::string letter_confirmed_;
+  static constexpr int kLetterStableFrames = 3;
 };
 
 } // namespace myvideo
