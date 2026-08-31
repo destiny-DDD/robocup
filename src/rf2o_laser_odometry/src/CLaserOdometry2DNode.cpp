@@ -221,7 +221,7 @@ void CLaserOdometry2DNode::publish()
   //set the velocity
   odom.child_frame_id = base_frame_id;
   odom.twist.twist.linear.x = rf2o_ref.lin_speed;    //linear speed
-  odom.twist.twist.linear.y = 0.0;
+  odom.twist.twist.linear.y = rf2o_ref.lat_speed;    //lateral speed
   odom.twist.twist.angular.z = rf2o_ref.ang_speed;   //angular speed
   //publish the message
   odom_pub->publish(odom);

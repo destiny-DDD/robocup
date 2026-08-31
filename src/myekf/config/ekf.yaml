@@ -4,7 +4,7 @@
     ros__parameters:
         # 滤波器输出位置估计的频率（Hz）。注意：滤波器在收到至少一条输入消息之前不会开始计算。
         # 一旦启动，它将按照此处指定的频率持续运行，无论是否收到更多测量值。默认值为 30。
-        frequency: 30.0
+        frequency: 10.0
 
         # 传感器超时时间（秒）。超过此时间未收到传感器数据，滤波器将执行预测周期而不进行校正。
         # 此参数可以理解为滤波器生成新输出的最低频率。默认值为 1 / frequency。
@@ -13,7 +13,7 @@
         # ekf_localization_node 和 ukf_localization_node 都使用 3D 全向运动模型。如果将此参数
         # 设为 true，状态估计中将不使用 3D 信息。适用于平面环境，可以忽略地面微小起伏（例如 IMU
         # 可能检测到的波动）。默认值为 false。
-        two_d_mode: false
+        two_d_mode: true
 
         # 为 ekf_localization_node 生成的 tf 变换提供一个时间偏移量。可用于对变换进行"未来时间戳"
         # 标记，某些功能包需要这种处理才能正常交互。默认值为 0.0。
@@ -86,13 +86,13 @@
         # 因此该参数对每个传感器实际上都是必填项。
         odom0_config: [true, true, false,
                        false, false, false,
-                       false, false, false,
+                       true, true, false,
                        false, false, false,
                        false, false, false]
 
         # 如果数据频率较高，或者 frequency 参数值较低，可能需要增大订阅队列的大小，
         # 以便融合更多的测量值。
-        odom0_queue_size: 2
+        odom0_queue_size: 3
 
         # [高级] 当使用两个传感器测量同一个位姿变量时，可能出现两个传感器都低估了其协方差的
         # 情况。这会导致滤波器在每次收到测量值时在两个值之间快速来回跳动。在这种情况下，
