@@ -31,6 +31,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'map': amcl_config,
+            'slam': 'True',
             'params_file': nav_config,
             'use_localization': 'True',
         }.items()
