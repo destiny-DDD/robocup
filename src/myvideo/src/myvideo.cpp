@@ -4,10 +4,15 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <cmath>
 #include <cstring>
+#include <fcntl.h>
 #include <filesystem>
+#include <linux/videodev2.h>
 #include <opencv2/imgproc.hpp>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include <thread>
 
 namespace myvideo {
@@ -26,6 +31,8 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
   tesseract_psm_ =
       this->declare_parameter<int>("tesseract_psm", tesseract_psm_);
   show_window_ = this->declare_parameter<bool>("show_window", HasDisplay());
+  camera_device_ =
+      this->declare_parameter<std::string>("camera_device", camera_device_);
 
   svm_model_path_ = this->declare_parameter<std::string>("svm_model_path", "");
   white_s_min_ = this->declare_parameter<int>("white_s_min", white_s_min_);
@@ -43,6 +50,11 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
   LoadTemplates();
 
   cap.open(2);
+  if (cap.isOpened()) {
+    InitCameraExposure();
+  } else {
+    RCLCPP_ERROR(this->get_logger(), "摄像头打开失败，无法设置曝光");
+  }
 
   serial_->start_receive([this](const std::vector<uint8_t> &buffer) {
     if (buffer.size() != sizeof(ser::VideoMsg)) {
@@ -67,6 +79,55 @@ MyVideo::MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial)
 }
 
 MyVideo::~MyVideo() { cv::destroyAllWindows(); }
+
+bool MyVideo::InitCameraExposure() {
+  const int fd = ::open(camera_device_.c_str(), O_RDWR | O_NONBLOCK);
+  if (fd < 0) {
+    RCLCPP_ERROR(this->get_logger(), "无法打开 V4L2 设备 %s: %s",
+                 camera_device_.c_str(), std::strerror(errno));
+    return false;
+  }
+
+  bool success = true;
+  v4l2_control control{};
+  control.id = V4L2_CID_EXPOSURE_AUTO;
+  control.value = V4L2_EXPOSURE_MANUAL;
+  if (::ioctl(fd, VIDIOC_S_CTRL, &control) < 0) {
+    RCLCPP_ERROR(this->get_logger(), "设置手动曝光模式失败: %s",
+                 std::strerror(errno));
+    success = false;
+  }
+
+  control = {};
+  control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+  control.value = 78;
+  if (::ioctl(fd, VIDIOC_S_CTRL, &control) < 0) {
+    RCLCPP_ERROR(this->get_logger(), "设置曝光时间 78 失败: %s",
+                 std::strerror(errno));
+    success = false;
+  }
+
+  v4l2_control auto_control{};
+  auto_control.id = V4L2_CID_EXPOSURE_AUTO;
+  v4l2_control exposure_control{};
+  exposure_control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+  const bool read_auto = ::ioctl(fd, VIDIOC_G_CTRL, &auto_control) == 0;
+  const bool read_exposure =
+      ::ioctl(fd, VIDIOC_G_CTRL, &exposure_control) == 0;
+  if (read_auto && read_exposure) {
+    RCLCPP_INFO(this->get_logger(),
+                "摄像头曝光初始化: auto_exposure=%d, exposure_time_absolute=%d",
+                auto_control.value, exposure_control.value);
+    success = success && auto_control.value == V4L2_EXPOSURE_MANUAL &&
+              exposure_control.value == 78;
+  } else {
+    RCLCPP_WARN(this->get_logger(), "无法回读 V4L2 曝光设置: %s",
+                std::strerror(errno));
+    success = false;
+  }
+  ::close(fd);
+  return success;
+}
 
 bool MyVideo::HasDisplay() {
   const char *const display = std::getenv("DISPLAY");
@@ -478,7 +539,7 @@ bool MyVideo::InitHogSvm() {
       svm_model_path_ =
           (std::filesystem::path(ament_index_cpp::get_package_share_directory(
                                     "myvideo")) /
-           "model" / "abcd_hog_svm.yml")
+           "model" / "abcd_hog_svm_v2_rawtrained_r2.yml")
               .string();
     } catch (const std::exception &error) {
       RCLCPP_ERROR(this->get_logger(), "无法解析 SVM 模型路径: %s",

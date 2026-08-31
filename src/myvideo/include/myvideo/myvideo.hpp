@@ -15,7 +15,7 @@
 namespace myvideo {
 class MyVideo : public rclcpp::Node {
 public:
-  std::atomic<int> num{3};
+  std::atomic<int> num{4};
   MyVideo(const std::string &name, std::shared_ptr<ser::MySer> serial);
   ~MyVideo();
   void TimeCallback();
@@ -43,12 +43,14 @@ private:
   bool FindBestTemplate(const cv::Mat &gray, MatchResult &best) const;
   bool InitTesseract();
   bool InitHogSvm();
+  bool InitCameraExposure();
   bool NormalizeCharacter(const cv::Mat &character_mask,
                           cv::Mat &normalized) const;
   bool ExtractHog(const cv::Mat &normalized, cv::Mat &features) const;
 
   cv::VideoCapture cap;
   cv::Mat image_origin;
+  std::string camera_device_ = "/dev/video2";
 
   // 有 X 显示时才弹窗口（OpenCV Qt 走 xcb 后端，需要 DISPLAY）。
   // 无显示环境（如 SSH 运行）跳过 imshow/waitKey，避免节点崩溃。
