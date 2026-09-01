@@ -8,7 +8,7 @@ def generate_launch_description():
     amcl_config = os.path.join(
         get_package_share_directory('mynav2'),
         'maps',
-        'maps.yaml',
+        'maps2.yaml',
     )
     nav_config = os.path.join(
         get_package_share_directory('mynav2'),

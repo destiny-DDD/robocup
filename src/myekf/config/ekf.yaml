@@ -86,7 +86,7 @@
         # 因此该参数对每个传感器实际上都是必填项。
         odom0_config: [true, true, false,
                        false, false, false,
-                       true, true, false,
+                       false, false, false,
                        false, false, false,
                        false, false, false]
 
